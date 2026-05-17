@@ -1,0 +1,13 @@
+{
+  "domain": "vehicle_maintenance",
+  "name": "Vehicle Maintenance",
+  "version": "0.1.0",
+  "documentation": "https://github.com/example/ha-vehicle-maintenance",
+  "issue_tracker": "https://github.com/example/ha-vehicle-maintenance/issues",
+  "dependencies": [],
+  "codeowners": [],
+  "requirements": [],
+  "config_flow": true,
+  "iot_class": "local_push",
+  "integration_type": "service"
+}

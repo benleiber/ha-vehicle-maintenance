@@ -1,0 +1,18 @@
+{
+  "title": "Vehicle Maintenance",
+  "config": {
+    "abort": {
+      "single_instance_allowed": "Only a single Vehicle Maintenance configuration is supported."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "odometer": {
+        "name": "Odometer"
+      },
+      "next_maintenance_summary": {
+        "name": "Next maintenance"
+      }
+    }
+  }
+}
