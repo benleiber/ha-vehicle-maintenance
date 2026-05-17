@@ -26,6 +26,36 @@ The included schedules are **seed templates only** and must be verified against 
 
 HACS is not required for the MVP.
 
+## Install from Studio Code Server
+
+If you use the Studio Code Server add-on in Home Assistant, you can pull this repo directly onto your instance:
+
+1. Open the Studio Code Server add-on.
+2. Open a terminal in the Home Assistant config directory.
+3. Clone the repository:
+
+```bash
+git clone https://github.com/benleiber/ha-vehicle-maintenance.git
+```
+
+4. Create the `custom_components` directory if it does not already exist:
+
+```bash
+mkdir -p custom_components
+```
+
+5. Copy the integration into Home Assistant's custom components folder:
+
+```bash
+cp -R ha-vehicle-maintenance/custom_components/vehicle_maintenance custom_components/
+```
+
+6. Restart Home Assistant.
+7. In Home Assistant, go to `Settings -> Devices & Services -> Add Integration`.
+8. Search for `Vehicle Maintenance` and add it.
+
+If you prefer, you can also open the cloned repo in Studio Code Server and drag the `vehicle_maintenance` folder into `/config/custom_components/`.
+
 ## Example vehicles
 
 ### Manual odometer vehicle
