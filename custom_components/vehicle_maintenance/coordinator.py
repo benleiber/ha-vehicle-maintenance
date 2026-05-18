@@ -7,9 +7,11 @@ import logging
 from typing import Any
 
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
+from .const import DOMAIN
 from .models import MaintenanceTemplate, Vehicle, calculate_due_status, summarize_due, template_from_dict
 from .store import VehicleMaintenanceStore
 from .templates import SEED_TEMPLATES
@@ -20,9 +22,15 @@ LOGGER = logging.getLogger(__name__)
 class VehicleMaintenanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     """Coordinate storage data and entity-backed odometer updates."""
 
-    def __init__(self, hass: HomeAssistant, store: VehicleMaintenanceStore) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        store: VehicleMaintenanceStore,
+        config_entry_id: str,
+    ) -> None:
         super().__init__(hass, logger=LOGGER, name="vehicle_maintenance")
         self.store = store
+        self.config_entry_id = config_entry_id
         self.templates: dict[str, MaintenanceTemplate] = {}
         self._unsubscribe_state_listener: Callable[[], None] | None = None
 
@@ -122,6 +130,7 @@ class VehicleMaintenanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def async_delete_vehicle(self, vehicle_id: str) -> None:
         """Delete a vehicle and refresh state."""
         await self.store.async_delete_vehicle(vehicle_id)
+        self._remove_vehicle_registry_entries(vehicle_id)
         self._setup_entity_listener()
         await self.async_refresh()
 
@@ -143,3 +152,15 @@ class VehicleMaintenanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def get_template_choices(self) -> dict[str, str]:
         """Expose template choices for config and services."""
         return {template_id: template.label for template_id, template in self.templates.items()}
+
+    def _remove_vehicle_registry_entries(self, vehicle_id: str) -> None:
+        """Remove entity and device registry entries for a deleted vehicle."""
+        entity_registry = er.async_get(self.hass)
+        for entity_entry in er.async_entries_for_config_entry(entity_registry, self.config_entry_id):
+            if entity_entry.unique_id.startswith(f"{vehicle_id}_"):
+                entity_registry.async_remove(entity_entry.entity_id)
+
+        device_registry = dr.async_get(self.hass)
+        device_entry = device_registry.async_get_device(identifiers={(DOMAIN, vehicle_id)})
+        if device_entry is not None:
+            device_registry.async_remove_device(device_entry.id)

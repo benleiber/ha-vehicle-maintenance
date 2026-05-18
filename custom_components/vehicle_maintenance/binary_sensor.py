@@ -89,6 +89,9 @@ class VehicleItemDueBinarySensor(VehicleMaintenanceCoordinatorEntity, BinarySens
     @property
     def extra_state_attributes(self) -> dict:
         if self.vehicle_snapshot is None:
-            return {}
+            return self.vehicle_attributes
         status = self.vehicle_snapshot["due_statuses"].get(self.item_id)
-        return {} if status is None else due_status_to_dict(status)
+        return self.vehicle_attributes if status is None else {
+            **self.vehicle_attributes,
+            **due_status_to_dict(status),
+        }

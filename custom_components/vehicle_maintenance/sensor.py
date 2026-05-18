@@ -78,12 +78,14 @@ class VehicleOdometerSensor(VehicleMaintenanceCoordinatorEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, str | None]:
+        if self.vehicle is None:
+            return self.vehicle_attributes
         return {
-            "template_id": self.vehicle.template_id,
+            **self.vehicle_attributes,
             "schedule_disclaimer": self.vehicle.template_disclaimer,
             "odometer_source_mode": self.vehicle.odometer_source_mode,
             "odometer_entity_id": self.vehicle.odometer_entity_id,
-        } if self.vehicle is not None else {}
+        }
 
 
 class VehicleNextMaintenanceSummarySensor(VehicleMaintenanceCoordinatorEntity, SensorEntity):
@@ -108,7 +110,8 @@ class VehicleNextMaintenanceSummarySensor(VehicleMaintenanceCoordinatorEntity, S
 
     @property
     def extra_state_attributes(self) -> dict:
-        return {} if self.vehicle_snapshot is None else {
+        return self.vehicle_attributes if self.vehicle_snapshot is None else {
+            **self.vehicle_attributes,
             "items": {
                 item_id: due_status_to_dict(status)
                 for item_id, status in self.vehicle_snapshot["due_statuses"].items()
@@ -149,9 +152,12 @@ class VehicleItemDueMileageSensor(VehicleMaintenanceCoordinatorEntity, SensorEnt
     @property
     def extra_state_attributes(self) -> dict:
         if self.vehicle_snapshot is None:
-            return {}
+            return self.vehicle_attributes
         status = self.vehicle_snapshot["due_statuses"].get(self.item_id)
-        return {} if status is None else due_status_to_dict(status)
+        return self.vehicle_attributes if status is None else {
+            **self.vehicle_attributes,
+            **due_status_to_dict(status),
+        }
 
 
 class VehicleItemDueDateSensor(VehicleMaintenanceCoordinatorEntity, SensorEntity):
@@ -182,6 +188,9 @@ class VehicleItemDueDateSensor(VehicleMaintenanceCoordinatorEntity, SensorEntity
     @property
     def extra_state_attributes(self) -> dict:
         if self.vehicle_snapshot is None:
-            return {}
+            return self.vehicle_attributes
         status = self.vehicle_snapshot["due_statuses"].get(self.item_id)
-        return {} if status is None else due_status_to_dict(status)
+        return self.vehicle_attributes if status is None else {
+            **self.vehicle_attributes,
+            **due_status_to_dict(status),
+        }

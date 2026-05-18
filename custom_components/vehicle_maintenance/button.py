@@ -27,11 +27,14 @@ async def async_setup_entry(
     def _async_sync_entities() -> None:
         new_entities: list[ButtonEntity] = []
         for vehicle_id in coordinator.data["vehicles"]:
-            unique_id = f"{vehicle_id}_log_next_due"
-            if unique_id in known_ids:
-                continue
-            known_ids.add(unique_id)
-            new_entities.append(LogNextDueMaintenanceButton(coordinator, vehicle_id))
+            log_unique_id = f"{vehicle_id}_log_next_due"
+            if log_unique_id not in known_ids:
+                known_ids.add(log_unique_id)
+                new_entities.append(LogNextDueMaintenanceButton(coordinator, vehicle_id))
+            delete_unique_id = f"{vehicle_id}_delete_vehicle"
+            if delete_unique_id not in known_ids:
+                known_ids.add(delete_unique_id)
+                new_entities.append(DeleteVehicleButton(coordinator, vehicle_id))
         if new_entities:
             async_add_entities(new_entities)
 
@@ -78,3 +81,32 @@ class LogNextDueMaintenanceButton(VehicleMaintenanceCoordinatorEntity, ButtonEnt
                 "notes": "Logged from quick action button",
             }
         )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str | int | None]:
+        return self.vehicle_attributes
+
+
+class DeleteVehicleButton(VehicleMaintenanceCoordinatorEntity, ButtonEntity):
+    """Delete the tracked vehicle and remove its entities."""
+
+    _attr_icon = "mdi:trash-can"
+
+    def __init__(self, coordinator, vehicle_id: str) -> None:
+        super().__init__(coordinator, vehicle_id)
+        self._attr_unique_id = f"{vehicle_id}_delete_vehicle"
+
+    @property
+    def name(self) -> str:
+        return (
+            f"{self.vehicle.name} delete vehicle"
+            if self.vehicle is not None
+            else f"{self.vehicle_id} delete vehicle"
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str | int | None]:
+        return self.vehicle_attributes
+
+    async def async_press(self) -> None:
+        await self.coordinator.async_delete_vehicle(self.vehicle_id)

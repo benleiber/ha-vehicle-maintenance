@@ -101,7 +101,7 @@ async def async_setup(hass: HomeAssistant, config: Mapping[str, Any]) -> bool:
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up the integration from a config entry."""
     store = VehicleMaintenanceStore(hass)
-    coordinator = VehicleMaintenanceCoordinator(hass, store)
+    coordinator = VehicleMaintenanceCoordinator(hass, store, entry.entry_id)
     await coordinator.async_initialize()
     hass.data[DOMAIN][entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

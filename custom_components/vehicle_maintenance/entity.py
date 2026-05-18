@@ -29,6 +29,22 @@ class VehicleMaintenanceCoordinatorEntity(CoordinatorEntity[VehicleMaintenanceCo
         return None if snapshot is None else snapshot["vehicle"]
 
     @property
+    def vehicle_attributes(self) -> dict[str, str | int | None]:
+        """Return common vehicle metadata for entity attributes."""
+        if self.vehicle is None:
+            return {"vehicle_id": self.vehicle_id}
+        return {
+            "vehicle_id": self.vehicle_id,
+            "vehicle_name": self.vehicle.name,
+            "vehicle_year": self.vehicle.year,
+            "vehicle_make": self.vehicle.make,
+            "vehicle_model": self.vehicle.model,
+            "vehicle_trim": self.vehicle.trim,
+            "vehicle_engine": self.vehicle.engine,
+            "template_id": self.vehicle.template_id,
+        }
+
+    @property
     def available(self) -> bool:
         """Return availability based on coordinator data."""
         return super().available and self.vehicle_snapshot is not None

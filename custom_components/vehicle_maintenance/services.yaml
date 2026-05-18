@@ -68,10 +68,12 @@ edit_vehicle:
 
 delete_vehicle:
   name: Delete vehicle
-  description: Delete a tracked vehicle and its service history.
+  description: Delete a tracked vehicle, its service history, and its registered entities.
   fields:
     vehicle_id:
       required: true
+      example: 9cf9c0f839244a34b3a6e3b31c518f4d
+      description: Find this in the attributes of any entity for the vehicle, or use the delete vehicle button on the device page.
       selector:
         text:
 
