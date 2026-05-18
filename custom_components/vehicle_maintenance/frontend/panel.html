@@ -26,10 +26,26 @@
         color: var(--ink);
       }
       .app { max-width: 1180px; margin: 0 auto; padding: 20px; }
-      .hero, .card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; }
+      .hero, .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        align-self: start;
+      }
       .hero { padding: 20px; box-shadow: 0 8px 30px rgba(31, 41, 51, 0.08); }
-      .top-grid { display:grid; gap:16px; grid-template-columns: minmax(0, 1fr) minmax(320px, 1fr); margin-bottom:16px; }
-      .main-grid { display:grid; gap:16px; grid-template-columns: minmax(360px, 0.95fr) minmax(0, 1.25fr); }
+      .top-grid {
+        display:grid;
+        gap:16px;
+        grid-template-columns: minmax(0, 1fr) minmax(320px, 1fr);
+        margin-bottom:16px;
+        align-items:start;
+      }
+      .main-grid {
+        display:grid;
+        gap:16px;
+        grid-template-columns: minmax(360px, 0.95fr) minmax(0, 1.25fr);
+        align-items:start;
+      }
       .form-stack { display:grid; gap:16px; align-content:start; }
       .window-stack { display:grid; gap:16px; align-content:start; }
       .card { padding: 16px; }
@@ -100,13 +116,6 @@
         justify-content:space-between;
         gap: 12px;
       }
-      .summary-box {
-        border: 1px solid var(--line);
-        border-radius: 14px;
-        padding: 12px;
-        background: var(--accent-soft);
-        margin-top: 12px;
-      }
       .card-head {
         display:flex;
         align-items:flex-start;
@@ -140,19 +149,12 @@
       .menu button {
         text-align:left;
         background: transparent;
-        color: var(--danger);
+        color: var(--ink);
         border: none;
         padding: 10px 12px;
       }
-      .window-summary-grid {
-        display:grid;
-        gap: 10px;
-      }
-      .window-summary-item {
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        padding: 10px 12px;
-        background: white;
+      .menu button.delete-action {
+        color: var(--danger);
       }
       .editor-card {
         border: 1px solid var(--line);
@@ -160,6 +162,62 @@
         padding: 14px;
         background: #f7f4ec;
         margin-bottom: 12px;
+      }
+      .maintenance-meta {
+        display:grid;
+        gap: 4px;
+        margin-top: 6px;
+      }
+      .maintenance-meta strong {
+        color: var(--ink);
+      }
+      .editor-shell {
+        margin-bottom: 16px;
+      }
+      .editor-shell[hidden] {
+        display: none;
+      }
+      .section-divider {
+        margin: 18px 0 10px;
+      }
+      .subscription-list {
+        display: grid;
+        gap: 12px;
+        margin-top: 12px;
+      }
+      .subscription-card {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 14px;
+        background: #fcfaf4;
+      }
+      .subscription-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+      .subscription-header button {
+        width: auto;
+        padding: 8px 10px;
+        background: #f3efe4;
+        color: var(--danger);
+      }
+      .subscription-summary {
+        display: grid;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      .subscription-summary-item {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 12px;
+        background: white;
+      }
+      .inline-note {
+        font-size: 0.88rem;
+        color: var(--muted);
       }
       @media (max-width: 1000px) {
         .top-grid,
@@ -187,17 +245,20 @@
               <h2>Vehicle Snapshot</h2>
             </div>
             <div class="menu-wrap">
-              <button id="snapshotMenuButton" class="menu-trigger" aria-label="Vehicle actions">⋯</button>
+              <button id="snapshotMenuButton" class="menu-trigger" aria-label="Vehicle actions">&#8942;</button>
               <div id="snapshotMenu" class="menu">
-                <button id="deleteVehicleButton" type="button">Delete vehicle</button>
+                <button id="editVehicleButton" type="button">Edit vehicle</button>
+                <button id="exportVehicleHistoryButton" type="button">Export vehicle history</button>
+                <button id="deleteVehicleButton" class="delete-action" type="button">Delete vehicle</button>
               </div>
             </div>
           </div>
           <div id="vehicleDetails"></div>
-          <div class="summary-box" id="windowSummary"></div>
           <div id="deleteHelp" class="muted" style="margin-top: 8px;"></div>
         </section>
       </div>
+
+      <section id="vehicleEditor" class="card editor-shell" hidden></section>
 
       <div class="main-grid">
         <div class="form-stack">
@@ -269,9 +330,11 @@
     </div>
     <script type="module">
       const state = {
+        templates: {},
         vehicles: [],
         selectedVehicleId: null,
         checkedItemIds: new Set(),
+        editingVehicle: null,
         editingRecord: null,
         historyGroups: [],
       };
@@ -312,6 +375,7 @@
 
       async function fetchData() {
         const data = await callApi("GET", "vehicle_maintenance/ui-data");
+        state.templates = data.templates || {};
         state.vehicles = data.vehicles || [];
         if (!state.selectedVehicleId && state.vehicles.length) {
           state.selectedVehicleId = state.vehicles[0].vehicle_id;
@@ -334,6 +398,87 @@
         if (status.is_due) return '<span class="pill due">Due now</span>';
         if (status.is_due_soon) return '<span class="pill due">Due soon</span>';
         return '<span class="pill">Upcoming</span>';
+      }
+
+      function formatMileage(value) {
+        return Number.isFinite(value) ? `${value.toLocaleString()} mi` : "n/a";
+      }
+
+      function formatCurrency(value) {
+        return Number.isFinite(value)
+          ? new Intl.NumberFormat("en-US", {
+              style: "currency",
+              currency: "USD",
+            }).format(value)
+          : "n/a";
+      }
+
+      function formatDueTarget(mileage, dateValue) {
+        const mileageText = formatMileage(mileage);
+        if (!dateValue) {
+          return mileageText;
+        }
+        return `${mileageText} | ${dateValue}`;
+      }
+
+      function formatLastDone(status) {
+        if (status?.last_service_odometer == null) {
+          return "No logged service yet";
+        }
+        return formatDueTarget(status.last_service_odometer, status.last_service_date);
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;");
+      }
+
+      function normalizeSubscription(subscription = {}) {
+        return {
+          id: subscription.id || globalThis.crypto?.randomUUID?.() || `sub_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+          name: subscription.name || "",
+          category: subscription.category || "",
+          provider: subscription.provider || "",
+          start_date: subscription.start_date || "",
+          renewal_date: subscription.renewal_date || "",
+          cost: subscription.cost ?? "",
+          notes: subscription.notes || "",
+        };
+      }
+
+      function cloneVehicleForEditing(vehicle) {
+        return {
+          vehicle_id: vehicle.vehicle_id,
+          name: vehicle.vehicle.name || "",
+          year: vehicle.vehicle.year ?? "",
+          make: vehicle.vehicle.make || "",
+          model: vehicle.vehicle.model || "",
+          trim: vehicle.vehicle.trim || "",
+          engine: vehicle.vehicle.engine || "",
+          vin: vehicle.vehicle.vin || "",
+          purchase_date: vehicle.vehicle.purchase_date || "",
+          purchase_odometer: vehicle.vehicle.purchase_odometer ?? "",
+          warranty_start_date: vehicle.vehicle.warranty_start_date || "",
+          warranty_years: vehicle.vehicle.warranty_years ?? "",
+          warranty_miles: vehicle.vehicle.warranty_miles ?? "",
+          warranty_name: vehicle.vehicle.warranty_name || "",
+          current_odometer: vehicle.vehicle.current_odometer ?? "",
+          odometer_source_mode: vehicle.vehicle.odometer_source_mode || "manual",
+          odometer_entity_id: vehicle.vehicle.odometer_entity_id || "",
+          template_id: vehicle.vehicle.template_id || "",
+          subscriptions: (vehicle.vehicle.subscriptions || []).map(normalizeSubscription),
+        };
+      }
+
+      function startEditingVehicle() {
+        const vehicle = selectedVehicle();
+        if (!vehicle) return;
+        state.editingVehicle = cloneVehicleForEditing(vehicle);
+        render();
+        $("vehicleEditor")?.scrollIntoView({ behavior: "smooth", block: "start" });
       }
 
       function groupHistoryRecords(records) {
@@ -401,6 +546,222 @@
         return groupedDates;
       }
 
+      function renderVehicleEditor(vehicle) {
+        const editor = $("vehicleEditor");
+        if (!editor) return;
+        if (!state.editingVehicle || !vehicle) {
+          editor.hidden = true;
+          editor.innerHTML = "";
+          return;
+        }
+
+        const templateOptions = [
+          '<option value="">Custom / keep existing schedule</option>',
+          ...Object.entries(state.templates).map(([templateId, label]) => `
+            <option value="${escapeHtml(templateId)}" ${state.editingVehicle.template_id === templateId ? "selected" : ""}>
+              ${escapeHtml(label)}
+            </option>
+          `),
+        ].join("");
+
+        const subscriptionMarkup = state.editingVehicle.subscriptions.length
+          ? state.editingVehicle.subscriptions.map((subscription, index) => `
+            <div class="subscription-card">
+              <div class="subscription-header">
+                <strong>Subscription ${index + 1}</strong>
+                <button type="button" data-remove-subscription="${index}">Remove</button>
+              </div>
+              <div class="row">
+                <label>Name<input data-subscription-field="name" data-subscription-index="${index}" value="${escapeHtml(subscription.name)}" placeholder="SiriusXM or roadside plan" /></label>
+                <label>Category<input data-subscription-field="category" data-subscription-index="${index}" value="${escapeHtml(subscription.category)}" placeholder="entertainment, security, roadside" /></label>
+              </div>
+              <div class="row">
+                <label>Provider<input data-subscription-field="provider" data-subscription-index="${index}" value="${escapeHtml(subscription.provider)}" placeholder="Subaru, SiriusXM, AAA" /></label>
+                <label>Renewal date<input data-subscription-field="renewal_date" data-subscription-index="${index}" type="date" value="${escapeHtml(subscription.renewal_date)}" /></label>
+              </div>
+              <div class="row">
+                <label>Start date<input data-subscription-field="start_date" data-subscription-index="${index}" type="date" value="${escapeHtml(subscription.start_date)}" /></label>
+                <label>Cost<input data-subscription-field="cost" data-subscription-index="${index}" type="number" min="0" step="0.01" value="${escapeHtml(subscription.cost)}" /></label>
+              </div>
+              <label>Notes<textarea data-subscription-field="notes" data-subscription-index="${index}">${escapeHtml(subscription.notes)}</textarea></label>
+            </div>
+          `).join("")
+          : '<p class="inline-note">No subscriptions tracked yet. Add one only if this vehicle actually has a plan like SiriusXM, roadside, or security.</p>';
+
+        editor.hidden = false;
+        editor.innerHTML = `
+          <div class="card-head">
+            <div>
+              <h2>Edit Vehicle</h2>
+              <p>Update the original vehicle profile fields and optionally track renewable plans like SiriusXM, roadside assistance, or a connected security package.</p>
+            </div>
+          </div>
+          <div class="row">
+            <label>Name<input id="editVehicleName" value="${escapeHtml(state.editingVehicle.name)}" /></label>
+            <label>Year<input id="editVehicleYear" type="number" min="1900" max="2100" value="${escapeHtml(state.editingVehicle.year)}" /></label>
+          </div>
+          <div class="row">
+            <label>Make<input id="editVehicleMake" value="${escapeHtml(state.editingVehicle.make)}" /></label>
+            <label>Model<input id="editVehicleModel" value="${escapeHtml(state.editingVehicle.model)}" /></label>
+          </div>
+          <div class="row">
+            <label>Trim<input id="editVehicleTrim" value="${escapeHtml(state.editingVehicle.trim)}" /></label>
+            <label>Engine<input id="editVehicleEngine" value="${escapeHtml(state.editingVehicle.engine)}" /></label>
+          </div>
+          <div class="row">
+            <label>VIN<input id="editVehicleVin" value="${escapeHtml(state.editingVehicle.vin)}" /></label>
+            <label>Template
+              <select id="editVehicleTemplate">${templateOptions}</select>
+            </label>
+          </div>
+          <div class="row">
+            <label>Current odometer<input id="editVehicleCurrentOdometer" type="number" min="0" value="${escapeHtml(state.editingVehicle.current_odometer)}" /></label>
+            <label>Odometer source mode
+              <select id="editVehicleOdometerMode">
+                <option value="manual" ${state.editingVehicle.odometer_source_mode === "manual" ? "selected" : ""}>manual</option>
+                <option value="entity" ${state.editingVehicle.odometer_source_mode === "entity" ? "selected" : ""}>entity</option>
+              </select>
+            </label>
+          </div>
+          <div class="row">
+            <label>Odometer entity id<input id="editVehicleOdometerEntityId" value="${escapeHtml(state.editingVehicle.odometer_entity_id)}" placeholder="sensor.outback_odometer" /></label>
+            <label>Purchase odometer<input id="editVehiclePurchaseOdometer" type="number" min="0" value="${escapeHtml(state.editingVehicle.purchase_odometer)}" /></label>
+          </div>
+          <div class="row">
+            <label>Purchase date<input id="editVehiclePurchaseDate" type="date" value="${escapeHtml(state.editingVehicle.purchase_date)}" /></label>
+            <label>Warranty start date<input id="editVehicleWarrantyStartDate" type="date" value="${escapeHtml(state.editingVehicle.warranty_start_date)}" /></label>
+          </div>
+          <div class="row">
+            <label>Warranty years<input id="editVehicleWarrantyYears" type="number" min="0" value="${escapeHtml(state.editingVehicle.warranty_years)}" /></label>
+            <label>Warranty miles<input id="editVehicleWarrantyMiles" type="number" min="0" value="${escapeHtml(state.editingVehicle.warranty_miles)}" /></label>
+          </div>
+          <div class="row">
+            <label>Warranty name<input id="editVehicleWarrantyName" value="${escapeHtml(state.editingVehicle.warranty_name)}" /></label>
+          </div>
+          <div class="section-divider">
+            <h3>Tracked Subscriptions</h3>
+            <p class="inline-note">Optional. Add only the plans this vehicle actually uses, then bump the renewal date and cost forward when they renew.</p>
+          </div>
+          <div id="subscriptionList" class="subscription-list">${subscriptionMarkup}</div>
+          <div class="stack" style="margin-top: 12px;">
+            <button id="addSubscriptionButton" class="secondary" type="button">Add subscription</button>
+            <button id="saveVehicleButton" type="button">Save vehicle</button>
+            <button id="cancelVehicleEditButton" class="secondary" type="button">Cancel</button>
+          </div>
+        `;
+
+        $("addSubscriptionButton")?.addEventListener("click", () => {
+          state.editingVehicle.subscriptions.push(normalizeSubscription());
+          render();
+        });
+
+        $("cancelVehicleEditButton")?.addEventListener("click", () => {
+          state.editingVehicle = null;
+          render();
+        });
+
+        document.querySelectorAll("button[data-remove-subscription]").forEach((button) => {
+          button.addEventListener("click", () => {
+            state.editingVehicle.subscriptions.splice(Number(button.dataset.removeSubscription), 1);
+            render();
+          });
+        });
+
+        $("saveVehicleButton")?.addEventListener("click", async () => {
+          const updates = collectVehicleUpdates();
+          if (!updates) {
+            return;
+          }
+          await sendAction("edit_vehicle", {
+            vehicle_id: state.editingVehicle.vehicle_id,
+            updates,
+          });
+          state.editingVehicle = null;
+          render();
+        });
+      }
+
+      function blankToNull(value) {
+        return value === "" ? null : value;
+      }
+
+      function numberOrNull(value) {
+        return value === "" ? null : Number(value);
+      }
+
+      function collectVehicleUpdates() {
+        if (!state.editingVehicle) {
+          return null;
+        }
+        const subscriptions = state.editingVehicle.subscriptions.map((subscription, index) => ({
+          id: subscription.id,
+          name: document.querySelector(`[data-subscription-field="name"][data-subscription-index="${index}"]`)?.value || "",
+          category: blankToNull(document.querySelector(`[data-subscription-field="category"][data-subscription-index="${index}"]`)?.value || ""),
+          provider: blankToNull(document.querySelector(`[data-subscription-field="provider"][data-subscription-index="${index}"]`)?.value || ""),
+          start_date: blankToNull(document.querySelector(`[data-subscription-field="start_date"][data-subscription-index="${index}"]`)?.value || ""),
+          renewal_date: blankToNull(document.querySelector(`[data-subscription-field="renewal_date"][data-subscription-index="${index}"]`)?.value || ""),
+          cost: numberOrNull(document.querySelector(`[data-subscription-field="cost"][data-subscription-index="${index}"]`)?.value || ""),
+          notes: document.querySelector(`[data-subscription-field="notes"][data-subscription-index="${index}"]`)?.value || "",
+        })).filter((subscription) => subscription.name);
+
+        const updates = {
+          name: $("editVehicleName").value,
+          year: Number($("editVehicleYear").value),
+          make: $("editVehicleMake").value,
+          model: $("editVehicleModel").value,
+          trim: $("editVehicleTrim").value,
+          engine: $("editVehicleEngine").value,
+          vin: blankToNull($("editVehicleVin").value),
+          purchase_date: blankToNull($("editVehiclePurchaseDate").value),
+          purchase_odometer: numberOrNull($("editVehiclePurchaseOdometer").value),
+          warranty_start_date: blankToNull($("editVehicleWarrantyStartDate").value),
+          warranty_years: numberOrNull($("editVehicleWarrantyYears").value),
+          warranty_miles: numberOrNull($("editVehicleWarrantyMiles").value),
+          warranty_name: blankToNull($("editVehicleWarrantyName").value),
+          current_odometer: Number($("editVehicleCurrentOdometer").value || 0),
+          odometer_source_mode: $("editVehicleOdometerMode").value,
+          odometer_entity_id: blankToNull($("editVehicleOdometerEntityId").value),
+          template_id: blankToNull($("editVehicleTemplate").value),
+          subscriptions,
+        };
+        if (!updates.name || !updates.make || !updates.model || !updates.year) {
+          $("status").textContent = "Name, year, make, and model are required.";
+          return null;
+        }
+        if (updates.odometer_source_mode === "entity" && !updates.odometer_entity_id) {
+          $("status").textContent = "Entity odometer mode requires an entity id.";
+          return null;
+        }
+        return updates;
+      }
+
+      function renderSubscriptionSummary(vehicle) {
+        const subscriptions = vehicle.subscription_statuses || [];
+        if (!subscriptions.length) {
+          return '<p><strong>Tracked subscriptions:</strong> none</p>';
+        }
+        return `
+          <div class="subscription-summary">
+            ${subscriptions.map((subscription) => `
+              <div class="subscription-summary-item">
+                <strong>${escapeHtml(subscription.name)}</strong>
+                <div class="muted">
+                  ${(subscription.provider || subscription.category)
+                    ? `${escapeHtml(subscription.provider || "Unknown provider")} | ${escapeHtml(subscription.category || "general")}`
+                    : "No provider details"}
+                </div>
+                <div class="muted">
+                  ${subscription.renewal_date
+                    ? `${subscription.is_active ? "Renews" : "Expired"} ${escapeHtml(subscription.renewal_date)}`
+                    : "No renewal date set"}
+                  ${subscription.days_remaining != null ? ` | ${subscription.days_remaining} days` : ""}
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        `;
+      }
+
       function windowMarkup(window, emphasize = false) {
         if (!window) {
           return "<p>No window available.</p>";
@@ -409,15 +770,19 @@
         const items = window.items.map((item) => {
           const checked = state.checkedItemIds.has(item.id) ? "checked" : "";
           const dueBadge = badgeForStatus(item.due_status);
-          const lastDone = item.due_status?.last_service_odometer
-            ? `Last done at ${item.due_status.last_service_odometer.toLocaleString()} mi`
-            : "No logged service yet";
+          const lastDoneText = formatLastDone(item.due_status);
+          const manualNextText = formatMileage(item.due_status?.manual_next_due_mileage);
+          const adjustedNextText = formatMileage(item.due_status?.adjusted_next_due_mileage);
           return `
             <label class="check">
               <input type="checkbox" data-item-id="${item.id}" ${checked} />
               <div>
                 <div class="check-title">${item.name}</div>
-                <div class="muted">${lastDone}</div>
+                <div class="maintenance-meta muted">
+                  <div><strong>Last done:</strong> ${lastDoneText}</div>
+                  <div><strong>Manual next:</strong> ${manualNextText}</div>
+                  <div><strong>Adjusted next:</strong> ${adjustedNextText}</div>
+                </div>
                 <div class="stack">${dueBadge}</div>
               </div>
             </label>
@@ -452,7 +817,6 @@
           $("currentWindow").innerHTML = "<p>No schedule windows available.</p>";
           $("previousWindow").innerHTML = "<p>No schedule windows available.</p>";
           $("nextWindow").innerHTML = "<p>No schedule windows available.</p>";
-          $("windowSummary").innerHTML = "<p>No schedule summary available.</p>";
           return;
         }
 
@@ -460,17 +824,6 @@
         $("currentWindow").innerHTML = windowMarkup(byLabel.current, true);
         $("previousWindow").innerHTML = windowMarkup(byLabel.previous, false);
         $("nextWindow").innerHTML = windowMarkup(byLabel.next, false);
-
-        $("windowSummary").innerHTML = `
-          <div class="window-summary-grid">
-            ${windows.map((window) => `
-              <div class="window-summary-item">
-                <strong>${window.label.charAt(0).toUpperCase() + window.label.slice(1)}</strong><br />
-                ${window.scheduled_mileage.toLocaleString()} mi
-              </div>
-            `).join("")}
-          </div>
-        `;
 
         document.querySelectorAll("input[data-item-id]").forEach((checkbox) => {
           checkbox.addEventListener("change", (event) => {
@@ -494,10 +847,10 @@
         if (!vehicle) {
           $("vehicleSummary").innerHTML = "<p>No vehicles available.</p>";
           $("vehicleDetails").innerHTML = "";
+          renderVehicleEditor(null);
           $("currentWindow").innerHTML = "";
           $("previousWindow").innerHTML = "";
           $("nextWindow").innerHTML = "";
-          $("windowSummary").innerHTML = "";
           $("history").innerHTML = "";
           return;
         }
@@ -511,15 +864,18 @@
 
         $("vehicleDetails").innerHTML = `
           <p><strong>Odometer:</strong> ${vehicle.vehicle.current_odometer.toLocaleString()} mi</p>
+          <p><strong>Total maintenance cost:</strong> ${formatCurrency(vehicle.total_maintenance_cost)}</p>
           <p><strong>Warranty miles remaining:</strong> ${vehicle.warranty_miles_remaining ?? "n/a"}</p>
           <p><strong>Warranty expiration:</strong> ${vehicle.warranty_expiration_date ?? "n/a"}</p>
           <p><strong>Template:</strong> ${vehicle.vehicle.template_id ?? "custom"}</p>
+          ${renderSubscriptionSummary(vehicle)}
         `;
 
         $("deleteHelp").textContent = vehicle.delete_confirmation_armed
           ? `Delete armed until ${vehicle.delete_confirmation_armed_until}. Press again to confirm.`
           : "First press arms deletion for 30 seconds. Press again to confirm.";
 
+        renderVehicleEditor(vehicle);
         renderServiceWindows(vehicle);
 
         const editorMarkup = state.editingRecord ? `
@@ -633,10 +989,15 @@
         $("status").textContent = "Saving...";
         try {
           const payload = await callApi("POST", "vehicle_maintenance/ui-action", { action, data });
+          state.templates = payload.templates || state.templates;
           state.vehicles = payload.vehicles || [];
+          if (action === "edit_vehicle") {
+            resetPaneFormState();
+          }
           if (action === "delete_vehicle" && !state.vehicles.some((v) => v.vehicle_id === state.selectedVehicleId)) {
             state.selectedVehicleId = state.vehicles[0]?.vehicle_id ?? null;
             state.checkedItemIds = new Set();
+            state.editingVehicle = null;
             state.editingRecord = null;
           }
           render();
@@ -650,6 +1011,7 @@
 
       $("vehicleSelect").addEventListener("change", (event) => {
         state.selectedVehicleId = event.target.value;
+        state.editingVehicle = null;
         resetPaneFormState();
         render();
       });
@@ -710,6 +1072,45 @@
         const vehicle = selectedVehicle();
         if (!vehicle) return;
         await sendAction("delete_vehicle", { vehicle_id: vehicle.vehicle_id });
+      });
+
+      $("editVehicleButton").addEventListener("click", () => {
+        startEditingVehicle();
+        $("snapshotMenu").classList.remove("open");
+      });
+
+      $("exportVehicleHistoryButton").addEventListener("click", () => {
+        const vehicle = selectedVehicle();
+        if (!vehicle) return;
+        const exportPayload = {
+          exported_at: new Date().toISOString(),
+          vehicle: vehicle.vehicle,
+          summary: vehicle.summary,
+          total_maintenance_cost: vehicle.total_maintenance_cost,
+          warranty_expiration_date: vehicle.warranty_expiration_date,
+          warranty_miles_remaining: vehicle.warranty_miles_remaining,
+          subscription_statuses: vehicle.subscription_statuses,
+          schedule_items: vehicle.schedule_items,
+          service_windows: vehicle.service_windows,
+          recent_service_records: vehicle.recent_service_records,
+        };
+        const blob = new Blob([JSON.stringify(exportPayload, null, 2)], {
+          type: "application/json",
+        });
+        const link = document.createElement("a");
+        const slug = (vehicle.vehicle.name || "vehicle-history")
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "");
+        const objectUrl = URL.createObjectURL(blob);
+        link.href = objectUrl;
+        link.download = `${slug || "vehicle-history"}-${today}.json`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(objectUrl);
+        $("snapshotMenu").classList.remove("open");
+        $("status").textContent = "Vehicle history exported.";
       });
 
       $("snapshotMenuButton").addEventListener("click", () => {

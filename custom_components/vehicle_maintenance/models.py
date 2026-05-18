@@ -50,6 +50,36 @@ class MaintenanceTemplate:
 
 
 @dataclass(slots=True)
+class VehicleSubscription:
+    """Optional vehicle subscription or plan."""
+
+    id: str
+    name: str
+    category: str | None = None
+    provider: str | None = None
+    start_date: str | None = None
+    renewal_date: str | None = None
+    cost: float | None = None
+    notes: str = ""
+
+
+@dataclass(slots=True)
+class SubscriptionStatus:
+    """Calculated status for a vehicle subscription."""
+
+    id: str
+    name: str
+    category: str | None
+    provider: str | None
+    start_date: str | None
+    renewal_date: str | None
+    cost: float | None
+    notes: str
+    is_active: bool
+    days_remaining: int | None
+
+
+@dataclass(slots=True)
 class ServiceEvent:
     """Logged maintenance event."""
 
@@ -96,6 +126,7 @@ class Vehicle:
     odometer_entity_id: str | None = None
     template_id: str | None = None
     schedule_items: list[MaintenanceItemDefinition] = field(default_factory=list)
+    subscriptions: list[VehicleSubscription] = field(default_factory=list)
     template_disclaimer: str | None = None
 
 
@@ -105,6 +136,10 @@ class DueStatus:
 
     item_id: str
     name: str
+    manual_next_due_mileage: int | None
+    manual_next_due_date: str | None
+    adjusted_next_due_mileage: int | None
+    adjusted_next_due_date: str | None
     next_due_mileage: int | None
     next_due_date: str | None
     miles_remaining: int | None
@@ -127,11 +162,24 @@ def template_from_dict(data: dict[str, Any]) -> MaintenanceTemplate:
     )
 
 
+def subscription_from_dict(data: dict[str, Any]) -> VehicleSubscription:
+    """Deserialize a vehicle subscription."""
+    payload = dict(data)
+    payload.setdefault("id", uuid4().hex)
+    if payload.get("cost") is not None:
+        payload["cost"] = float(payload["cost"])
+    payload["notes"] = payload.get("notes", "")
+    return VehicleSubscription(**payload)
+
+
 def vehicle_from_dict(data: dict[str, Any]) -> Vehicle:
     """Deserialize a vehicle."""
     payload = dict(data)
     payload["schedule_items"] = [
         MaintenanceItemDefinition(**item) for item in payload.get("schedule_items", [])
+    ]
+    payload["subscriptions"] = [
+        subscription_from_dict(item) for item in payload.get("subscriptions", [])
     ]
     return Vehicle(**payload)
 
@@ -140,6 +188,7 @@ def vehicle_to_dict(vehicle: Vehicle) -> dict[str, Any]:
     """Serialize a vehicle."""
     payload = asdict(vehicle)
     payload["schedule_items"] = [asdict(item) for item in vehicle.schedule_items]
+    payload["subscriptions"] = [asdict(item) for item in vehicle.subscriptions]
     return payload
 
 
@@ -186,6 +235,10 @@ def make_vehicle(data: dict[str, Any], template: MaintenanceTemplate | None) -> 
         odometer_entity_id=data.get("odometer_entity_id"),
         template_id=template.id if template else data.get("template_id"),
         schedule_items=list(template.items) if template else [],
+        subscriptions=[
+            subscription_from_dict(item)
+            for item in data.get("subscriptions", [])
+        ],
         template_disclaimer=template.disclaimer if template else None,
     )
     if vehicle.odometer_source_mode == ODOMETER_MODE_ENTITY and not vehicle.odometer_entity_id:
@@ -331,6 +384,60 @@ def calculate_warranty_miles_remaining(vehicle: Vehicle) -> int | None:
     return vehicle.warranty_miles - vehicle.current_odometer
 
 
+def calculate_subscription_statuses(
+    vehicle: Vehicle,
+    today: date | None = None,
+) -> list[SubscriptionStatus]:
+    """Return computed subscription and plan statuses for a vehicle."""
+    reference_date = today or _today()
+    statuses: list[SubscriptionStatus] = []
+    for subscription in vehicle.subscriptions:
+        if subscription.renewal_date is None:
+            days_remaining = None
+            is_active = True
+        else:
+            renewal_date = date.fromisoformat(subscription.renewal_date)
+            days_remaining = (renewal_date - reference_date).days
+            is_active = days_remaining >= 0
+        statuses.append(
+            SubscriptionStatus(
+                id=subscription.id,
+                name=subscription.name,
+                category=subscription.category,
+                provider=subscription.provider,
+                start_date=subscription.start_date,
+                renewal_date=subscription.renewal_date,
+                cost=subscription.cost,
+                notes=subscription.notes,
+                is_active=is_active,
+                days_remaining=days_remaining,
+            )
+        )
+    return sorted(
+        statuses,
+        key=lambda item: (
+            item.days_remaining is None,
+            item.days_remaining if item.days_remaining is not None else 10**9,
+            item.name.lower(),
+        ),
+    )
+
+
+def calculate_total_maintenance_cost(
+    vehicle_id: str,
+    events: list[ServiceEvent],
+) -> float:
+    """Return the total logged maintenance cost for a vehicle."""
+    return round(
+        sum(
+            event.cost or 0
+            for event in events
+            if event.vehicle_id == vehicle_id
+        ),
+        2,
+    )
+
+
 def calculate_due_status(
     vehicle: Vehicle,
     item: MaintenanceItemDefinition,
@@ -351,19 +458,39 @@ def calculate_due_status(
     )
     last_event = item_events[-1] if item_events else None
 
+    manual_next_due_mileage = _manufacturer_due_mileage(item, vehicle.current_odometer)
     if item_resets_on_service(item) and last_event and item.interval_miles is not None:
-        next_due_mileage = last_event.odometer + item.interval_miles
+        adjusted_next_due_mileage = last_event.odometer + item.interval_miles
         basis = "last_service_event"
     else:
-        next_due_mileage = _manufacturer_due_mileage(item, vehicle.current_odometer)
+        adjusted_next_due_mileage = manual_next_due_mileage
         basis = "manufacturer_anchor"
 
     if item.interval_months is not None and last_event:
-        next_due_date = _next_due_date_from_event(last_event, item.interval_months)
+        adjusted_next_due_date = _next_due_date_from_event(last_event, item.interval_months)
     elif item.interval_months is not None and not last_event:
-        next_due_date = reference_date + timedelta(days=_months_to_days(item.interval_months))
+        adjusted_next_due_date = reference_date + timedelta(days=_months_to_days(item.interval_months))
     else:
-        next_due_date = None
+        adjusted_next_due_date = None
+
+    if (
+        item.interval_months is not None
+        and item.manufacturer_anchor_miles is not None
+        and manual_next_due_mileage is not None
+        and item.interval_miles
+    ):
+        remaining_intervals = max(
+            0,
+            (manual_next_due_mileage - item.manufacturer_anchor_miles) // item.interval_miles,
+        )
+        manual_next_due_date = reference_date + timedelta(
+            days=_months_to_days(item.interval_months * remaining_intervals),
+        )
+    else:
+        manual_next_due_date = adjusted_next_due_date
+
+    next_due_mileage = adjusted_next_due_mileage
+    next_due_date = adjusted_next_due_date
 
     miles_remaining = (
         None if next_due_mileage is None else int(next_due_mileage - vehicle.current_odometer)
@@ -387,6 +514,12 @@ def calculate_due_status(
     return DueStatus(
         item_id=item.id,
         name=item.name,
+        manual_next_due_mileage=manual_next_due_mileage,
+        manual_next_due_date=manual_next_due_date.isoformat() if manual_next_due_date else None,
+        adjusted_next_due_mileage=adjusted_next_due_mileage,
+        adjusted_next_due_date=(
+            adjusted_next_due_date.isoformat() if adjusted_next_due_date else None
+        ),
         next_due_mileage=next_due_mileage,
         next_due_date=next_due_date.isoformat() if next_due_date else None,
         miles_remaining=miles_remaining,

@@ -95,6 +95,8 @@ def _serialize_vehicle_panel_data(coordinator) -> dict[str, Any]:
                 "is_due": snapshot["is_due"],
                 "warranty_expiration_date": snapshot["warranty_expiration_date"],
                 "warranty_miles_remaining": snapshot["warranty_miles_remaining"],
+                "total_maintenance_cost": snapshot["total_maintenance_cost"],
+                "subscription_statuses": snapshot["subscription_statuses"],
                 "schedule_items": schedule_items,
                 "service_windows": service_windows,
                 "recent_service_records": snapshot["recent_service_records"],
@@ -168,6 +170,11 @@ class VehicleMaintenancePanelActionView(HomeAssistantView):
             await coordinator.async_log_maintenance(payload["data"])
         elif action == "log_service_record":
             await coordinator.async_log_service_record(payload["data"])
+        elif action == "edit_vehicle":
+            await coordinator.async_edit_vehicle(
+                payload["data"]["vehicle_id"],
+                payload["data"]["updates"],
+            )
         elif action == "edit_service_record":
             await coordinator.async_edit_service_record(
                 payload["data"]["event_id"],

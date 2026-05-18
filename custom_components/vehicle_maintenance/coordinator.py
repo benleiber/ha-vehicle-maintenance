@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import asdict
 from datetime import timedelta
 import logging
 from typing import Any
@@ -17,7 +18,9 @@ from .const import DELETE_CONFIRMATION_WINDOW_SECONDS, DOMAIN
 from .models import (
     MaintenanceTemplate,
     Vehicle,
+    calculate_subscription_statuses,
     calculate_due_status,
+    calculate_total_maintenance_cost,
     calculate_warranty_expiration_date,
     calculate_warranty_miles_remaining,
     event_to_dict,
@@ -122,6 +125,13 @@ class VehicleMaintenanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "is_due": any(status.is_due for status in due_statuses),
                 "warranty_expiration_date": calculate_warranty_expiration_date(vehicle),
                 "warranty_miles_remaining": calculate_warranty_miles_remaining(vehicle),
+                "total_maintenance_cost": calculate_total_maintenance_cost(
+                    vehicle.id,
+                    self.store.service_events,
+                ),
+                "subscription_statuses": [
+                    asdict(status) for status in calculate_subscription_statuses(vehicle)
+                ],
                 "recent_service_records": [
                     event_to_dict(event)
                     for event in sorted(

@@ -6,7 +6,10 @@ from custom_components.vehicle_maintenance.models import (
     MaintenanceItemDefinition,
     ServiceEvent,
     Vehicle,
+    VehicleSubscription,
+    calculate_subscription_statuses,
     calculate_due_status,
+    calculate_total_maintenance_cost,
     calculate_warranty_expiration_date,
     calculate_warranty_miles_remaining,
     get_scheduled_items_for_mileage,
@@ -170,6 +173,76 @@ def test_warranty_projection_uses_purchase_and_mileage() -> None:
 
     assert calculate_warranty_expiration_date(vehicle) == "2032-05-30"
     assert calculate_warranty_miles_remaining(vehicle) == 94000
+
+
+def test_subscription_statuses_support_optional_vehicle_plans() -> None:
+    vehicle = Vehicle(
+        id="veh1",
+        name="Subaru",
+        year=2024,
+        make="Subaru",
+        model="Outback",
+        trim="Onyx XT",
+        engine="2.4T",
+        subscriptions=[
+            VehicleSubscription(
+                id="sub1",
+                name="SiriusXM",
+                category="entertainment",
+                provider="SiriusXM",
+                renewal_date="2026-06-01",
+            ),
+            VehicleSubscription(
+                id="sub2",
+                name="Roadside Plus",
+                category="roadside",
+                provider="AAA",
+                renewal_date="2026-05-01",
+            ),
+        ],
+    )
+
+    statuses = calculate_subscription_statuses(vehicle, today=date(2026, 5, 17))
+
+    assert statuses[0].name == "Roadside Plus"
+    assert statuses[0].is_active is False
+    assert statuses[0].days_remaining == -16
+    assert statuses[1].name == "SiriusXM"
+    assert statuses[1].is_active is True
+    assert statuses[1].days_remaining == 15
+
+
+def test_total_maintenance_cost_adds_logged_costs_for_vehicle() -> None:
+    events = [
+        ServiceEvent(
+            id="evt1",
+            vehicle_id="veh1",
+            item_id="engine_oil",
+            date="2026-01-01",
+            odometer=12000,
+            cost=72.50,
+        ),
+        ServiceEvent(
+            id="evt2",
+            vehicle_id="veh1",
+            item_id=None,
+            event_type="service_record",
+            title="Flat tire repair",
+            date="2026-02-01",
+            odometer=12500,
+            cost=33.25,
+        ),
+        ServiceEvent(
+            id="evt3",
+            vehicle_id="veh2",
+            item_id="engine_oil",
+            date="2026-03-01",
+            odometer=14000,
+            cost=10.00,
+        ),
+    ]
+
+    assert calculate_total_maintenance_cost("veh1", events) == 105.75
 
 
 def test_ad_hoc_service_record_does_not_reset_schedule() -> None:
