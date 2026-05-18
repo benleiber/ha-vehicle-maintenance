@@ -151,7 +151,7 @@
       }
 
       async function fetchData() {
-        const data = await callApi("GET", "/api/vehicle_maintenance/ui-data");
+        const data = await callApi("GET", "vehicle_maintenance/ui-data");
         state.vehicles = data.vehicles || [];
         if (!state.selectedVehicleId && state.vehicles.length) {
           state.selectedVehicleId = state.vehicles[0].vehicle_id;
@@ -224,7 +224,7 @@
       async function sendAction(action, data) {
         $("status").textContent = "Saving…";
         try {
-          const payload = await callApi("POST", "/api/vehicle_maintenance/ui-action", { action, data });
+          const payload = await callApi("POST", "vehicle_maintenance/ui-action", { action, data });
           state.vehicles = payload.vehicles || [];
           if (action === "delete_vehicle" && !state.vehicles.some((v) => v.vehicle_id === state.selectedVehicleId)) {
             state.selectedVehicleId = state.vehicles[0]?.vehicle_id ?? null;
