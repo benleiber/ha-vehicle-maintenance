@@ -6,6 +6,8 @@ This MVP supports:
 
 - Vehicles tracked manually or from an existing Home Assistant odometer sensor
 - Storage-backed vehicles and maintenance history
+- Purchase metadata and warranty tracking
+- One-off maintenance logging and full scheduled service visit logging
 - Seed maintenance templates for:
   - 2024 Subaru Outback 2.4T
   - 2021 Mazda CX-5 2.5
@@ -69,6 +71,12 @@ data:
   model: Outback
   trim: Onyx XT
   engine: 2.4T
+  purchase_date: "2024-06-01"
+  purchase_odometer: 14
+  warranty_start_date: "2024-06-01"
+  warranty_years: 8
+  warranty_miles: 120000
+  warranty_name: Subaru Added Security
   current_odometer: 18250
   odometer_source_mode: manual
   template_id: subaru_outback_2024_24t_seed
@@ -110,8 +118,39 @@ data:
   item_id: engine_oil
   date: "2026-05-17"
   odometer: 19442
+  service_source: self
   notes: Changed oil and filter
   cost: 72.50
+```
+
+### Log a complete scheduled visit
+
+This is useful when a dealer completed the whole 6k, 12k, 24k, or 30k visit and you want all matching schedule items recorded at once.
+
+```yaml
+service: vehicle_maintenance.log_service_visit
+data:
+  vehicle_id: YOUR_VEHICLE_ID
+  date: "2025-11-01"
+  odometer: 24012
+  scheduled_mileage: 24000
+  service_source: dealer
+  notes: Complete dealer 24k service
+```
+
+### Log a custom multi-item visit
+
+```yaml
+service: vehicle_maintenance.log_service_visit
+data:
+  vehicle_id: YOUR_VEHICLE_ID
+  date: "2026-05-17"
+  odometer: 26000
+  item_ids:
+    - engine_oil
+    - engine_oil_filter
+  service_source: self
+  notes: Early oil change before 30k
 ```
 
 ### Edit a vehicle
@@ -138,7 +177,10 @@ Per vehicle the integration exposes:
 
 - Odometer sensor
 - Next maintenance summary sensor
+- Warranty miles remaining sensor
+- Warranty expiration date sensor
 - Overall maintenance due binary sensor
+- Warranty active binary sensor
 - Per-maintenance-item due mileage sensors
 - Per-maintenance-item due date sensors
 - Per-maintenance-item due binary sensors
@@ -160,7 +202,7 @@ The integration keeps the seed manufacturer schedule separate from the user's ac
 
 Example:
 
-- If oil changes are logged every 5,000 miles by preference
-- But another item is seeded at 30,000 miles
-- The 30,000-mile item continues tracking from its own anchor and service history
-- It does not advance merely because five oil changes were logged
+- If oil changes are logged every 5,000 or 6,000 miles by preference, oil can reset from the last oil event
+- But another item seeded at 30,000 miles remains independent
+- Logging oil early does not mark unrelated 30,000-mile items complete
+- A complete scheduled visit can be logged in one action when the whole manufacturer interval was performed

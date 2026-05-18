@@ -38,6 +38,14 @@ async def async_setup_entry(
             if summary_id not in known_ids:
                 known_ids.add(summary_id)
                 new_entities.append(VehicleNextMaintenanceSummarySensor(coordinator, vehicle_id))
+            warranty_miles_id = f"{vehicle_id}_warranty_miles_remaining"
+            if warranty_miles_id not in known_ids:
+                known_ids.add(warranty_miles_id)
+                new_entities.append(VehicleWarrantyMilesRemainingSensor(coordinator, vehicle_id))
+            warranty_date_id = f"{vehicle_id}_warranty_expiration_date"
+            if warranty_date_id not in known_ids:
+                known_ids.add(warranty_date_id)
+                new_entities.append(VehicleWarrantyExpirationDateSensor(coordinator, vehicle_id))
             for item_id in vehicle_data["due_statuses"]:
                 mileage_id = f"{vehicle_id}_{item_id}_due_mileage"
                 if mileage_id not in known_ids:
@@ -194,3 +202,61 @@ class VehicleItemDueDateSensor(VehicleMaintenanceCoordinatorEntity, SensorEntity
             **self.vehicle_attributes,
             **due_status_to_dict(status),
         }
+
+
+class VehicleWarrantyMilesRemainingSensor(VehicleMaintenanceCoordinatorEntity, SensorEntity):
+    """Warranty mileage remaining sensor."""
+
+    _attr_device_class = SensorDeviceClass.DISTANCE
+    _attr_native_unit_of_measurement = UnitOfLength.MILES
+
+    def __init__(self, coordinator, vehicle_id: str) -> None:
+        super().__init__(coordinator, vehicle_id)
+        self._attr_unique_id = f"{vehicle_id}_warranty_miles_remaining"
+
+    @property
+    def name(self) -> str:
+        return (
+            f"{self.vehicle.name} warranty miles remaining"
+            if self.vehicle is not None
+            else f"{self.vehicle_id} warranty miles remaining"
+        )
+
+    @property
+    def native_value(self) -> int | None:
+        if self.vehicle_snapshot is None:
+            return None
+        return self.vehicle_snapshot["warranty_miles_remaining"]
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return self.vehicle_attributes
+
+
+class VehicleWarrantyExpirationDateSensor(VehicleMaintenanceCoordinatorEntity, SensorEntity):
+    """Warranty expiration date sensor."""
+
+    _attr_device_class = SensorDeviceClass.DATE
+
+    def __init__(self, coordinator, vehicle_id: str) -> None:
+        super().__init__(coordinator, vehicle_id)
+        self._attr_unique_id = f"{vehicle_id}_warranty_expiration_date"
+
+    @property
+    def name(self) -> str:
+        return (
+            f"{self.vehicle.name} warranty expiration"
+            if self.vehicle is not None
+            else f"{self.vehicle_id} warranty expiration"
+        )
+
+    @property
+    def native_value(self) -> date | None:
+        if self.vehicle_snapshot is None:
+            return None
+        value = self.vehicle_snapshot["warranty_expiration_date"]
+        return None if value is None else date.fromisoformat(value)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return self.vehicle_attributes

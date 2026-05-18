@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Callable
 
 from homeassistant.components.binary_sensor import BinarySensorEntity
@@ -31,6 +32,10 @@ async def async_setup_entry(
             if overall_id not in known_ids:
                 known_ids.add(overall_id)
                 new_entities.append(VehicleMaintenanceDueBinarySensor(coordinator, vehicle_id))
+            warranty_id = f"{vehicle_id}_warranty_active"
+            if warranty_id not in known_ids:
+                known_ids.add(warranty_id)
+                new_entities.append(VehicleWarrantyActiveBinarySensor(coordinator, vehicle_id))
             for item_id in vehicle_data["due_statuses"]:
                 item_unique_id = f"{vehicle_id}_{item_id}_due"
                 if item_unique_id not in known_ids:
@@ -94,4 +99,42 @@ class VehicleItemDueBinarySensor(VehicleMaintenanceCoordinatorEntity, BinarySens
         return self.vehicle_attributes if status is None else {
             **self.vehicle_attributes,
             **due_status_to_dict(status),
+        }
+
+
+class VehicleWarrantyActiveBinarySensor(VehicleMaintenanceCoordinatorEntity, BinarySensorEntity):
+    """Warranty active state."""
+
+    def __init__(self, coordinator, vehicle_id: str) -> None:
+        super().__init__(coordinator, vehicle_id)
+        self._attr_unique_id = f"{vehicle_id}_warranty_active"
+
+    @property
+    def name(self) -> str:
+        return (
+            f"{self.vehicle.name} warranty active"
+            if self.vehicle is not None
+            else f"{self.vehicle_id} warranty active"
+        )
+
+    @property
+    def is_on(self) -> bool:
+        if self.vehicle_snapshot is None:
+            return False
+        miles_remaining = self.vehicle_snapshot["warranty_miles_remaining"]
+        expiration_date = self.vehicle_snapshot["warranty_expiration_date"]
+        if miles_remaining is None and expiration_date is None:
+            return False
+        miles_ok = miles_remaining is None or miles_remaining >= 0
+        date_ok = expiration_date is None or date.fromisoformat(expiration_date) >= date.today()
+        return miles_ok and date_ok
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        if self.vehicle_snapshot is None:
+            return self.vehicle_attributes
+        return {
+            **self.vehicle_attributes,
+            "warranty_miles_remaining": self.vehicle_snapshot["warranty_miles_remaining"],
+            "warranty_expiration_date": self.vehicle_snapshot["warranty_expiration_date"],
         }

@@ -7,6 +7,9 @@ from custom_components.vehicle_maintenance.models import (
     ServiceEvent,
     Vehicle,
     calculate_due_status,
+    calculate_warranty_expiration_date,
+    calculate_warranty_miles_remaining,
+    get_scheduled_items_for_mileage,
     summarize_due,
 )
 
@@ -113,3 +116,56 @@ def test_summary_prefers_due_or_overdue_items() -> None:
     ]
 
     assert summarize_due(statuses) == "Brake Inspection overdue"
+
+
+def test_scheduled_service_visit_expands_matching_items() -> None:
+    vehicle = Vehicle(
+        id="veh1",
+        name="Subaru",
+        year=2024,
+        make="Subaru",
+        model="Outback",
+        trim="Onyx XT",
+        engine="2.4T",
+        schedule_items=[
+            MaintenanceItemDefinition(
+                id="engine_oil",
+                name="Engine Oil",
+                interval_miles=6000,
+                interval_months=6,
+                manufacturer_anchor_miles=6000,
+                resets_on_service=True,
+            ),
+            MaintenanceItemDefinition(
+                id="air_cleaner_element",
+                name="Air Cleaner Element",
+                interval_miles=30000,
+                interval_months=30,
+                manufacturer_anchor_miles=30000,
+            ),
+        ],
+    )
+
+    items = get_scheduled_items_for_mileage(vehicle, 30000)
+
+    assert [item.id for item in items] == ["engine_oil", "air_cleaner_element"]
+
+
+def test_warranty_projection_uses_purchase_and_mileage() -> None:
+    vehicle = Vehicle(
+        id="veh1",
+        name="Subaru",
+        year=2024,
+        make="Subaru",
+        model="Outback",
+        trim="Onyx XT",
+        engine="2.4T",
+        current_odometer=26000,
+        purchase_date="2024-06-01",
+        warranty_start_date="2024-06-01",
+        warranty_years=8,
+        warranty_miles=120000,
+    )
+
+    assert calculate_warranty_expiration_date(vehicle) == "2032-05-30"
+    assert calculate_warranty_miles_remaining(vehicle) == 94000

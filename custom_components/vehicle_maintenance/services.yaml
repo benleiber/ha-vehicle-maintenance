@@ -36,6 +36,33 @@ add_vehicle:
     vin:
       selector:
         text:
+    purchase_date:
+      description: Purchase or in-service date used for warranty tracking.
+      selector:
+        date:
+    purchase_odometer:
+      selector:
+        number:
+          min: 0
+          mode: box
+    warranty_start_date:
+      description: Optional override if warranty start differs from purchase date.
+      selector:
+        date:
+    warranty_years:
+      selector:
+        number:
+          min: 0
+          mode: box
+    warranty_miles:
+      selector:
+        number:
+          min: 0
+          mode: box
+    warranty_name:
+      example: Subaru Added Security
+      selector:
+        text:
     current_odometer:
       example: 18250
       selector:
@@ -59,7 +86,7 @@ add_vehicle:
 
 edit_vehicle:
   name: Edit vehicle
-  description: Update a tracked vehicle.
+  description: Update a tracked vehicle, including purchase and warranty metadata.
   fields:
     vehicle_id:
       required: true
@@ -95,7 +122,7 @@ update_odometer:
 
 log_maintenance:
   name: Log maintenance
-  description: Log a maintenance event for a vehicle and maintenance item.
+  description: Log a maintenance event for a single maintenance item. This is ideal for one-off work or early service like an out-of-cycle oil change.
   fields:
     vehicle_id:
       required: true
@@ -123,3 +150,51 @@ log_maintenance:
         number:
           min: 0
           mode: box
+    service_source:
+      example: self
+      selector:
+        text:
+
+log_service_visit:
+  name: Log service visit
+  description: Log a complete scheduled service visit or a multi-item maintenance visit.
+  fields:
+    vehicle_id:
+      required: true
+      selector:
+        text:
+    date:
+      required: true
+      selector:
+        date:
+    odometer:
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    scheduled_mileage:
+      description: Optional manufacturer visit mileage like 6000, 12000, 30000. When provided without item_ids, the integration logs all matching items from the vehicle schedule.
+      selector:
+        number:
+          min: 0
+          mode: box
+    item_ids:
+      description: Optional explicit item IDs to log as part of the visit.
+      example:
+        - engine_oil
+        - rotate_and_inspect_tires
+      selector:
+        object:
+    notes:
+      selector:
+        text:
+    cost:
+      selector:
+        number:
+          min: 0
+          mode: box
+    service_source:
+      example: dealer
+      selector:
+        text:

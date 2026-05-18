@@ -3,16 +3,27 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import timedelta
 import logging
 from typing import Any
 
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr, entity_registry as er
-from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
-from .models import MaintenanceTemplate, Vehicle, calculate_due_status, summarize_due, template_from_dict
+from .const import DELETE_CONFIRMATION_WINDOW_SECONDS, DOMAIN
+from .models import (
+    MaintenanceTemplate,
+    Vehicle,
+    calculate_due_status,
+    calculate_warranty_expiration_date,
+    calculate_warranty_miles_remaining,
+    get_scheduled_items_for_mileage,
+    summarize_due,
+    template_from_dict,
+)
 from .store import VehicleMaintenanceStore
 from .templates import SEED_TEMPLATES
 
@@ -33,6 +44,8 @@ class VehicleMaintenanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.config_entry_id = config_entry_id
         self.templates: dict[str, MaintenanceTemplate] = {}
         self._unsubscribe_state_listener: Callable[[], None] | None = None
+        self._delete_armed_until: dict[str, Any] = {}
+        self._delete_disarm_callbacks: dict[str, Callable[[], None]] = {}
 
     async def async_initialize(self) -> None:
         """Initialize storage, templates, listeners, and first snapshot."""
@@ -106,6 +119,8 @@ class VehicleMaintenanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "summary": summarize_due(due_statuses),
                 "due_statuses": {status.item_id: status for status in due_statuses},
                 "is_due": any(status.is_due for status in due_statuses),
+                "warranty_expiration_date": calculate_warranty_expiration_date(vehicle),
+                "warranty_miles_remaining": calculate_warranty_miles_remaining(vehicle),
             }
         return snapshot
 
@@ -129,6 +144,7 @@ class VehicleMaintenanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def async_delete_vehicle(self, vehicle_id: str) -> None:
         """Delete a vehicle and refresh state."""
+        self.async_clear_delete_arm(vehicle_id)
         await self.store.async_delete_vehicle(vehicle_id)
         self._remove_vehicle_registry_entries(vehicle_id)
         self._setup_entity_listener()
@@ -145,6 +161,30 @@ class VehicleMaintenanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.store.async_log_maintenance(data)
         await self.async_refresh()
 
+    async def async_log_service_visit(self, data: dict[str, Any]) -> None:
+        """Log a complete scheduled visit or a custom multi-item visit."""
+        vehicle = self.store.vehicles[data["vehicle_id"]]
+        item_ids: list[str]
+        if data.get("item_ids"):
+            item_ids = list(data["item_ids"])
+        else:
+            scheduled_mileage = int(data["scheduled_mileage"])
+            item_ids = [
+                item.id for item in get_scheduled_items_for_mileage(vehicle, scheduled_mileage)
+            ]
+        if not item_ids:
+            return
+
+        service_visit_id = f"{data['vehicle_id']}_{data['date']}_{data['odometer']}"
+        events = []
+        for item_id in item_ids:
+            event_data = dict(data)
+            event_data["item_id"] = item_id
+            event_data["service_visit_id"] = service_visit_id
+            events.append(event_data)
+        await self.store.async_log_maintenance_events(events)
+        await self.async_refresh()
+
     def get_vehicle_snapshot(self, vehicle_id: str) -> dict[str, Any]:
         """Return computed state for a vehicle."""
         return self.data["vehicles"][vehicle_id]
@@ -152,6 +192,36 @@ class VehicleMaintenanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def get_template_choices(self) -> dict[str, str]:
         """Expose template choices for config and services."""
         return {template_id: template.label for template_id, template in self.templates.items()}
+
+    def is_delete_armed(self, vehicle_id: str) -> bool:
+        """Return whether delete confirmation is currently armed."""
+        armed_until = self._delete_armed_until.get(vehicle_id)
+        return armed_until is not None and armed_until > dt_util.utcnow()
+
+    def get_delete_armed_until(self, vehicle_id: str) -> str | None:
+        """Return the confirmation expiry time."""
+        armed_until = self._delete_armed_until.get(vehicle_id)
+        return None if armed_until is None else armed_until.isoformat()
+
+    def async_arm_delete(self, vehicle_id: str) -> None:
+        """Arm delete confirmation for a short time window."""
+        self.async_clear_delete_arm(vehicle_id)
+        armed_until = dt_util.utcnow() + timedelta(seconds=DELETE_CONFIRMATION_WINDOW_SECONDS)
+        self._delete_armed_until[vehicle_id] = armed_until
+        self._delete_disarm_callbacks[vehicle_id] = async_call_later(
+            self.hass,
+            DELETE_CONFIRMATION_WINDOW_SECONDS,
+            lambda _: self.async_clear_delete_arm(vehicle_id),
+        )
+        self.async_update_listeners()
+
+    def async_clear_delete_arm(self, vehicle_id: str) -> None:
+        """Clear delete confirmation state."""
+        if unsub := self._delete_disarm_callbacks.pop(vehicle_id, None):
+            unsub()
+        if vehicle_id in self._delete_armed_until:
+            self._delete_armed_until.pop(vehicle_id, None)
+            self.async_update_listeners()
 
     def _remove_vehicle_registry_entries(self, vehicle_id: str) -> None:
         """Remove entity and device registry entries for a deleted vehicle."""

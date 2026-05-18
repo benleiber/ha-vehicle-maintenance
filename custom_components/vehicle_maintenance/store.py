@@ -101,3 +101,13 @@ class VehicleMaintenanceStore:
         self.service_events.append(event)
         await self.async_save()
         return event
+
+    async def async_log_maintenance_events(
+        self,
+        events_data: list[dict[str, Any]],
+    ) -> list[ServiceEvent]:
+        """Log multiple maintenance events as one save operation."""
+        events = [make_service_event(event_data) for event_data in events_data]
+        self.service_events.extend(events)
+        await self.async_save()
+        return events

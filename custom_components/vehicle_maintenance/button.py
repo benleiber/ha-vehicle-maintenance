@@ -88,7 +88,7 @@ class LogNextDueMaintenanceButton(VehicleMaintenanceCoordinatorEntity, ButtonEnt
 
 
 class DeleteVehicleButton(VehicleMaintenanceCoordinatorEntity, ButtonEntity):
-    """Delete the tracked vehicle and remove its entities."""
+    """Delete the tracked vehicle with a confirmation window."""
 
     _attr_icon = "mdi:trash-can"
 
@@ -98,6 +98,12 @@ class DeleteVehicleButton(VehicleMaintenanceCoordinatorEntity, ButtonEntity):
 
     @property
     def name(self) -> str:
+        if self.coordinator.is_delete_armed(self.vehicle_id):
+            return (
+                f"{self.vehicle.name} confirm delete vehicle"
+                if self.vehicle is not None
+                else f"{self.vehicle_id} confirm delete vehicle"
+            )
         return (
             f"{self.vehicle.name} delete vehicle"
             if self.vehicle is not None
@@ -106,7 +112,16 @@ class DeleteVehicleButton(VehicleMaintenanceCoordinatorEntity, ButtonEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, str | int | None]:
-        return self.vehicle_attributes
+        return {
+            **self.vehicle_attributes,
+            "delete_confirmation_armed": self.coordinator.is_delete_armed(self.vehicle_id),
+            "delete_confirmation_armed_until": self.coordinator.get_delete_armed_until(
+                self.vehicle_id
+            ),
+        }
 
     async def async_press(self) -> None:
+        if not self.coordinator.is_delete_armed(self.vehicle_id):
+            self.coordinator.async_arm_delete(self.vehicle_id)
+            return
         await self.coordinator.async_delete_vehicle(self.vehicle_id)

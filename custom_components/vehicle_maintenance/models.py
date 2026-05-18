@@ -34,6 +34,7 @@ class MaintenanceItemDefinition:
     interval_months: int | None = None
     manufacturer_anchor_miles: int | None = None
     flexible: bool = False
+    resets_on_service: bool = False
     due_soon_threshold_miles: int = DEFAULT_DUE_SOON_MILES
     overdue_threshold_miles: int = DEFAULT_OVERDUE_MILES
 
@@ -57,6 +58,9 @@ class ServiceEvent:
     item_id: str
     date: str
     odometer: int
+    source: str | None = None
+    scheduled_mileage: int | None = None
+    service_visit_id: str | None = None
     notes: str = ""
     cost: float | None = None
 
@@ -77,6 +81,12 @@ class Vehicle:
     trim: str
     engine: str
     vin: str | None = None
+    purchase_date: str | None = None
+    purchase_odometer: int | None = None
+    warranty_start_date: str | None = None
+    warranty_years: int | None = None
+    warranty_miles: int | None = None
+    warranty_name: str | None = None
     current_odometer: int = 0
     odometer_source_mode: str = ODOMETER_MODE_MANUAL
     odometer_entity_id: str | None = None
@@ -99,6 +109,8 @@ class DueStatus:
     is_due_soon: bool
     is_overdue: bool
     basis: str
+    last_service_date: str | None = None
+    last_service_odometer: int | None = None
 
 
 def template_from_dict(data: dict[str, Any]) -> MaintenanceTemplate:
@@ -153,6 +165,18 @@ def make_vehicle(data: dict[str, Any], template: MaintenanceTemplate | None) -> 
         trim=data.get("trim", ""),
         engine=data.get("engine", ""),
         vin=data.get("vin"),
+        purchase_date=data.get("purchase_date"),
+        purchase_odometer=(
+            int(data["purchase_odometer"]) if data.get("purchase_odometer") is not None else None
+        ),
+        warranty_start_date=data.get("warranty_start_date") or data.get("purchase_date"),
+        warranty_years=(
+            int(data["warranty_years"]) if data.get("warranty_years") is not None else None
+        ),
+        warranty_miles=(
+            int(data["warranty_miles"]) if data.get("warranty_miles") is not None else None
+        ),
+        warranty_name=data.get("warranty_name"),
         current_odometer=int(data.get("current_odometer", 0)),
         odometer_source_mode=data.get("odometer_source_mode", ODOMETER_MODE_MANUAL),
         odometer_entity_id=data.get("odometer_entity_id"),
@@ -177,6 +201,11 @@ def make_service_event(data: dict[str, Any]) -> ServiceEvent:
         item_id=data["item_id"],
         date=data["date"],
         odometer=int(data["odometer"]),
+        source=data.get("source"),
+        scheduled_mileage=(
+            int(data["scheduled_mileage"]) if data.get("scheduled_mileage") is not None else None
+        ),
+        service_visit_id=data.get("service_visit_id"),
         notes=data.get("notes", ""),
         cost=float(data["cost"]) if data.get("cost") is not None else None,
     )
@@ -197,6 +226,52 @@ def _next_due_date_from_event(last_event: ServiceEvent, months: int) -> date:
     return last_event.parsed_date + timedelta(days=_months_to_days(months))
 
 
+def item_resets_on_service(item: MaintenanceItemDefinition) -> bool:
+    """Return whether a matching event resets the next due interval."""
+    return item.resets_on_service or item.flexible
+
+
+def is_item_scheduled_for_mileage(
+    item: MaintenanceItemDefinition,
+    scheduled_mileage: int,
+) -> bool:
+    """Return whether a maintenance item belongs to a scheduled mileage visit."""
+    anchor = item.manufacturer_anchor_miles or item.interval_miles
+    if anchor is None or scheduled_mileage < anchor:
+        return False
+    if scheduled_mileage == anchor:
+        return True
+    interval = item.interval_miles or anchor
+    return (scheduled_mileage - anchor) % interval == 0
+
+
+def get_scheduled_items_for_mileage(
+    vehicle: Vehicle,
+    scheduled_mileage: int,
+) -> list[MaintenanceItemDefinition]:
+    """Return all schedule items associated with a scheduled mileage visit."""
+    return [
+        item
+        for item in vehicle.schedule_items
+        if is_item_scheduled_for_mileage(item, scheduled_mileage)
+    ]
+
+
+def calculate_warranty_expiration_date(vehicle: Vehicle) -> str | None:
+    """Return the projected warranty expiration date."""
+    if vehicle.warranty_start_date is None or vehicle.warranty_years is None:
+        return None
+    start_date = date.fromisoformat(vehicle.warranty_start_date)
+    return (start_date + timedelta(days=vehicle.warranty_years * 365)).isoformat()
+
+
+def calculate_warranty_miles_remaining(vehicle: Vehicle) -> int | None:
+    """Return remaining warranty miles."""
+    if vehicle.warranty_miles is None:
+        return None
+    return vehicle.warranty_miles - vehicle.current_odometer
+
+
 def calculate_due_status(
     vehicle: Vehicle,
     item: MaintenanceItemDefinition,
@@ -211,7 +286,7 @@ def calculate_due_status(
     )
     last_event = item_events[-1] if item_events else None
 
-    if item.flexible and last_event and item.interval_miles is not None:
+    if item_resets_on_service(item) and last_event and item.interval_miles is not None:
         next_due_mileage = last_event.odometer + item.interval_miles
         basis = "last_service_event"
     else:
@@ -255,6 +330,8 @@ def calculate_due_status(
         is_due_soon=is_due_soon,
         is_overdue=is_overdue,
         basis=basis,
+        last_service_date=None if last_event is None else last_event.date,
+        last_service_odometer=None if last_event is None else last_event.odometer,
     )
 
 

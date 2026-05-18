@@ -41,6 +41,12 @@ class VehicleMaintenanceCoordinatorEntity(CoordinatorEntity[VehicleMaintenanceCo
             "vehicle_model": self.vehicle.model,
             "vehicle_trim": self.vehicle.trim,
             "vehicle_engine": self.vehicle.engine,
+            "purchase_date": self.vehicle.purchase_date,
+            "purchase_odometer": self.vehicle.purchase_odometer,
+            "warranty_start_date": self.vehicle.warranty_start_date,
+            "warranty_years": self.vehicle.warranty_years,
+            "warranty_miles": self.vehicle.warranty_miles,
+            "warranty_name": self.vehicle.warranty_name,
             "template_id": self.vehicle.template_id,
         }
 
