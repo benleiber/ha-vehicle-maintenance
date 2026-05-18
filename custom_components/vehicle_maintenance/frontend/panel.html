@@ -215,6 +215,26 @@
         padding: 12px;
         background: white;
       }
+      .snapshot-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+      .snapshot-column {
+        display: grid;
+        gap: 10px;
+        align-content: start;
+      }
+      .snapshot-item {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 12px;
+        background: #fcfaf4;
+      }
+      .snapshot-item strong {
+        display: block;
+        margin-bottom: 4px;
+      }
       .inline-note {
         font-size: 0.88rem;
         color: var(--muted);
@@ -223,7 +243,10 @@
         .top-grid,
         .main-grid { grid-template-columns: 1fr; }
       }
-      @media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
+      @media (max-width: 640px) {
+        .row,
+        .snapshot-grid { grid-template-columns: 1fr; }
+      }
     </style>
   </head>
   <body>
@@ -254,7 +277,6 @@
             </div>
           </div>
           <div id="vehicleDetails"></div>
-          <div id="deleteHelp" class="muted" style="margin-top: 8px;"></div>
         </section>
       </div>
 
@@ -411,6 +433,56 @@
               currency: "USD",
             }).format(value)
           : "n/a";
+      }
+
+      function formatOwnershipLength(startDate) {
+        if (!startDate) {
+          return "n/a";
+        }
+        const start = new Date(startDate);
+        const end = new Date(today);
+        if (Number.isNaN(start.getTime()) || start > end) {
+          return "n/a";
+        }
+        let years = end.getFullYear() - start.getFullYear();
+        let months = end.getMonth() - start.getMonth();
+        if (end.getDate() < start.getDate()) {
+          months -= 1;
+        }
+        if (months < 0) {
+          years -= 1;
+          months += 12;
+        }
+        if (years <= 0 && months <= 0) {
+          return "Less than 1 month";
+        }
+        if (years > 0 && months > 0) {
+          return `${years} yr ${months} mo`;
+        }
+        if (years > 0) {
+          return `${years} yr`;
+        }
+        return `${months} mo`;
+      }
+
+      function calculateMilesPerYear(vehicle) {
+        if (!vehicle?.vehicle?.purchase_date) {
+          return null;
+        }
+        const start = new Date(vehicle.vehicle.purchase_date);
+        const end = new Date(today);
+        if (Number.isNaN(start.getTime()) || start >= end) {
+          return null;
+        }
+        const elapsedYears = (end - start) / (1000 * 60 * 60 * 24 * 365.25);
+        if (elapsedYears <= 0) {
+          return null;
+        }
+        const baselineOdometer = Number.isFinite(vehicle.vehicle.purchase_odometer)
+          ? vehicle.vehicle.purchase_odometer
+          : 0;
+        const drivenMiles = Math.max(0, vehicle.vehicle.current_odometer - baselineOdometer);
+        return Math.round(drivenMiles / elapsedYears);
       }
 
       function formatDueTarget(mileage, dateValue) {
@@ -738,7 +810,7 @@
       function renderSubscriptionSummary(vehicle) {
         const subscriptions = vehicle.subscription_statuses || [];
         if (!subscriptions.length) {
-          return '<p><strong>Tracked subscriptions:</strong> none</p>';
+          return '<div class="snapshot-item"><strong>Tracked subscriptions</strong><div class="muted">None tracked</div></div>';
         }
         return `
           <div class="subscription-summary">
@@ -862,18 +934,46 @@
           ${badge}
         `;
 
-        $("vehicleDetails").innerHTML = `
-          <p><strong>Odometer:</strong> ${vehicle.vehicle.current_odometer.toLocaleString()} mi</p>
-          <p><strong>Total maintenance cost:</strong> ${formatCurrency(vehicle.total_maintenance_cost)}</p>
-          <p><strong>Warranty miles remaining:</strong> ${vehicle.warranty_miles_remaining ?? "n/a"}</p>
-          <p><strong>Warranty expiration:</strong> ${vehicle.warranty_expiration_date ?? "n/a"}</p>
-          <p><strong>Template:</strong> ${vehicle.vehicle.template_id ?? "custom"}</p>
-          ${renderSubscriptionSummary(vehicle)}
-        `;
+        const ownershipLength = formatOwnershipLength(vehicle.vehicle.purchase_date);
+        const milesPerYear = calculateMilesPerYear(vehicle);
 
-        $("deleteHelp").textContent = vehicle.delete_confirmation_armed
-          ? `Delete armed until ${vehicle.delete_confirmation_armed_until}. Press again to confirm.`
-          : "First press arms deletion for 30 seconds. Press again to confirm.";
+        $("vehicleDetails").innerHTML = `
+          <div class="snapshot-grid">
+            <div class="snapshot-column">
+              <div class="snapshot-item">
+                <strong>Odometer</strong>
+                <div>${vehicle.vehicle.current_odometer.toLocaleString()} mi</div>
+              </div>
+              <div class="snapshot-item">
+                <strong>Length of ownership</strong>
+                <div>${ownershipLength}</div>
+              </div>
+              <div class="snapshot-item">
+                <strong>Miles per year</strong>
+                <div>${milesPerYear == null ? "n/a" : `${milesPerYear.toLocaleString()} mi/yr`}</div>
+              </div>
+              <div class="snapshot-item">
+                <strong>Total maintenance cost</strong>
+                <div>${formatCurrency(vehicle.total_maintenance_cost)}</div>
+              </div>
+            </div>
+            <div class="snapshot-column">
+              <div class="snapshot-item">
+                <strong>Warranty miles remaining</strong>
+                <div>${vehicle.warranty_miles_remaining ?? "n/a"}</div>
+              </div>
+              <div class="snapshot-item">
+                <strong>Warranty expiration</strong>
+                <div>${vehicle.warranty_expiration_date ?? "n/a"}</div>
+              </div>
+              <div class="snapshot-item">
+                <strong>Template</strong>
+                <div>${vehicle.vehicle.template_id ?? "custom"}</div>
+              </div>
+              ${renderSubscriptionSummary(vehicle)}
+            </div>
+          </div>
+        `;
 
         renderVehicleEditor(vehicle);
         renderServiceWindows(vehicle);
