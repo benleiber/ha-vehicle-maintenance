@@ -169,3 +169,42 @@ def test_warranty_projection_uses_purchase_and_mileage() -> None:
 
     assert calculate_warranty_expiration_date(vehicle) == "2032-05-30"
     assert calculate_warranty_miles_remaining(vehicle) == 94000
+
+
+def test_ad_hoc_service_record_does_not_reset_schedule() -> None:
+    vehicle = Vehicle(
+        id="veh1",
+        name="Car",
+        year=2024,
+        make="Subaru",
+        model="Outback",
+        trim="XT",
+        engine="2.4T",
+        current_odometer=26000,
+    )
+    item = MaintenanceItemDefinition(
+        id="engine_oil",
+        name="Engine Oil",
+        interval_miles=6000,
+        interval_months=6,
+        manufacturer_anchor_miles=6000,
+        resets_on_service=True,
+    )
+    events = [
+        ServiceEvent(
+            id="evt1",
+            vehicle_id="veh1",
+            item_id=None,
+            title="Flat tire repair",
+            category="tire",
+            event_type="service_record",
+            affects_schedule=False,
+            date="2026-05-17",
+            odometer=25990,
+        )
+    ]
+
+    status = calculate_due_status(vehicle, item, events, today=date(2026, 5, 17))
+
+    assert status.next_due_mileage == 30000
+    assert status.basis == "manufacturer_anchor"

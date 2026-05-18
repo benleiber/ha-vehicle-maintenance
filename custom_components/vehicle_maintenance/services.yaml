@@ -89,29 +89,55 @@ edit_vehicle:
   description: Update a tracked vehicle, including purchase and warranty metadata.
   fields:
     vehicle_id:
-      required: true
+      description: Optional raw vehicle id. Prefer vehicle_entity_id in the UI.
       selector:
         text:
+    vehicle_entity_id:
+      description: Pick any entity belonging to the vehicle you want to update.
+      selector:
+        entity:
+          integration: vehicle_maintenance
+          domain:
+            - sensor
+            - binary_sensor
+            - button
 
 delete_vehicle:
   name: Delete vehicle
   description: Delete a tracked vehicle, its service history, and its registered entities.
   fields:
     vehicle_id:
-      required: true
+      description: Optional raw vehicle id. Prefer vehicle_entity_id in the UI.
       example: 9cf9c0f839244a34b3a6e3b31c518f4d
-      description: Find this in the attributes of any entity for the vehicle, or use the delete vehicle button on the device page.
       selector:
         text:
+    vehicle_entity_id:
+      description: Pick any entity belonging to the vehicle you want to delete.
+      selector:
+        entity:
+          integration: vehicle_maintenance
+          domain:
+            - sensor
+            - binary_sensor
+            - button
 
 update_odometer:
   name: Update odometer
   description: Manually update a vehicle odometer.
   fields:
     vehicle_id:
-      required: true
+      description: Optional raw vehicle id. Prefer vehicle_entity_id in the UI.
       selector:
         text:
+    vehicle_entity_id:
+      description: Pick any entity belonging to the vehicle you want to update.
+      selector:
+        entity:
+          integration: vehicle_maintenance
+          domain:
+            - sensor
+            - binary_sensor
+            - button
     odometer:
       required: true
       example: 19442
@@ -125,9 +151,18 @@ log_maintenance:
   description: Log a maintenance event for a single maintenance item. This is ideal for one-off work or early service like an out-of-cycle oil change.
   fields:
     vehicle_id:
-      required: true
+      description: Optional raw vehicle id. Prefer vehicle_entity_id in the UI.
       selector:
         text:
+    vehicle_entity_id:
+      description: Pick any entity belonging to the vehicle you want to update.
+      selector:
+        entity:
+          integration: vehicle_maintenance
+          domain:
+            - sensor
+            - binary_sensor
+            - button
     item_id:
       required: true
       selector:
@@ -160,9 +195,18 @@ log_service_visit:
   description: Log a complete scheduled service visit or a multi-item maintenance visit.
   fields:
     vehicle_id:
-      required: true
+      description: Optional raw vehicle id. Prefer vehicle_entity_id in the UI.
       selector:
         text:
+    vehicle_entity_id:
+      description: Pick any entity belonging to the vehicle you want to update.
+      selector:
+        entity:
+          integration: vehicle_maintenance
+          domain:
+            - sensor
+            - binary_sensor
+            - button
     date:
       required: true
       selector:
@@ -196,5 +240,54 @@ log_service_visit:
           mode: box
     service_source:
       example: dealer
+      selector:
+        text:
+
+log_service_record:
+  name: Log service record
+  description: Log an ad hoc repair or service event that is part of the vehicle history but not necessarily part of the scheduled maintenance plan.
+  fields:
+    vehicle_id:
+      description: Optional raw vehicle id. Prefer vehicle_entity_id in the UI.
+      selector:
+        text:
+    vehicle_entity_id:
+      description: Pick any entity belonging to the vehicle you want to update.
+      selector:
+        entity:
+          integration: vehicle_maintenance
+          domain:
+            - sensor
+            - binary_sensor
+            - button
+    title:
+      required: true
+      example: Flat tire repair
+      selector:
+        text:
+    category:
+      example: tire
+      selector:
+        text:
+    date:
+      required: true
+      selector:
+        date:
+    odometer:
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    notes:
+      selector:
+        text:
+    cost:
+      selector:
+        number:
+          min: 0
+          mode: box
+    service_source:
+      example: discount tire
       selector:
         text:

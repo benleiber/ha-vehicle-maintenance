@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "documentation": "https://github.com/example/ha-vehicle-maintenance",
   "issue_tracker": "https://github.com/example/ha-vehicle-maintenance/issues",
-  "dependencies": [],
+  "dependencies": ["frontend"],
   "codeowners": [],
   "requirements": [],
   "config_flow": true,

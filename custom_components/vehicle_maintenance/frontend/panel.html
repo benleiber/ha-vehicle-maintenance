@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vehicle Maintenance</title>
+    <style>
+      :root {
+        --bg: #f4f1e8;
+        --card: #fffdf8;
+        --ink: #1f2933;
+        --muted: #52606d;
+        --line: #d9d3c4;
+        --accent: #14532d;
+        --warn: #b45309;
+        --danger: #b91c1c;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        background:
+          radial-gradient(circle at top right, #f9d8a3 0, transparent 28%),
+          linear-gradient(180deg, #f7f3ea 0%, var(--bg) 100%);
+        color: var(--ink);
+      }
+      .app { max-width: 1120px; margin: 0 auto; padding: 20px; }
+      .hero, .card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; }
+      .hero { padding: 20px; margin-bottom: 16px; box-shadow: 0 8px 30px rgba(31, 41, 51, 0.08); }
+      .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+      .card { padding: 16px; }
+      h1, h2, h3 { margin: 0 0 10px; }
+      p { margin: 0 0 10px; color: var(--muted); }
+      label { display: block; font-size: 0.9rem; margin-bottom: 10px; }
+      input, select, textarea, button {
+        width: 100%; border-radius: 12px; border: 1px solid var(--line); padding: 10px 12px; font: inherit;
+      }
+      textarea { min-height: 88px; resize: vertical; }
+      button { background: var(--accent); color: white; border: none; font-weight: 600; cursor: pointer; }
+      button.secondary { background: #324a5f; }
+      button.warn { background: var(--warn); }
+      button.danger { background: var(--danger); }
+      .pill { display:inline-block; padding:6px 10px; border-radius:999px; font-size:0.82rem; background:#e8f5e9; color:#166534; }
+      .pill.due { background:#fef3c7; color:#92400e; }
+      .pill.overdue { background:#fee2e2; color:#991b1b; }
+      .row { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+      .stack { display:flex; gap:10px; flex-wrap:wrap; }
+      .history { max-height: 420px; overflow:auto; }
+      .history-item { border-top:1px solid var(--line); padding:10px 0; }
+      .muted { color: var(--muted); font-size: 0.92rem; }
+      .status { margin-top: 10px; min-height: 22px; color: var(--accent); font-weight: 600; }
+      @media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <div class="hero">
+        <h1>Vehicle Maintenance</h1>
+        <p>Pick a vehicle, log scheduled visits or one-off work, and keep a clean history without touching YAML.</p>
+        <div class="row">
+          <label>
+            Vehicle
+            <select id="vehicleSelect"></select>
+          </label>
+          <div id="vehicleSummary"></div>
+        </div>
+      </div>
+
+      <div class="grid">
+        <section class="card">
+          <h2>Scheduled Visit</h2>
+          <p>Use this when a full factory visit was completed.</p>
+          <div class="row">
+            <label>Date<input id="visitDate" type="date" /></label>
+            <label>Odometer<input id="visitOdo" type="number" min="0" /></label>
+          </div>
+          <div class="row">
+            <label>Scheduled mileage<select id="scheduledMileage"></select></label>
+            <label>Source<input id="visitSource" placeholder="dealer" /></label>
+          </div>
+          <label>Notes<textarea id="visitNotes"></textarea></label>
+          <button id="visitButton">Log scheduled visit</button>
+        </section>
+
+        <section class="card">
+          <h2>One-Off Maintenance</h2>
+          <p>Use this for an early oil change or a specific maintenance item.</p>
+          <div class="row">
+            <label>Date<input id="maintenanceDate" type="date" /></label>
+            <label>Odometer<input id="maintenanceOdo" type="number" min="0" /></label>
+          </div>
+          <div class="row">
+            <label>Item<select id="maintenanceItem"></select></label>
+            <label>Source<input id="maintenanceSource" placeholder="self" /></label>
+          </div>
+          <label>Notes<textarea id="maintenanceNotes"></textarea></label>
+          <button id="maintenanceButton" class="secondary">Log maintenance item</button>
+        </section>
+
+        <section class="card">
+          <h2>Service Record</h2>
+          <p>Use this for ad hoc work like a flat tire repair, warranty repair, diagnostic visit, or alignment.</p>
+          <div class="row">
+            <label>Title<input id="recordTitle" placeholder="Flat tire repair" /></label>
+            <label>Category<input id="recordCategory" placeholder="tire" /></label>
+          </div>
+          <div class="row">
+            <label>Date<input id="recordDate" type="date" /></label>
+            <label>Odometer<input id="recordOdo" type="number" min="0" /></label>
+          </div>
+          <div class="row">
+            <label>Source<input id="recordSource" placeholder="discount tire" /></label>
+            <label>Cost<input id="recordCost" type="number" min="0" step="0.01" /></label>
+          </div>
+          <label>Notes<textarea id="recordNotes"></textarea></label>
+          <button id="recordButton">Log service record</button>
+        </section>
+
+        <section class="card">
+          <h2>Vehicle Snapshot</h2>
+          <div id="vehicleDetails"></div>
+          <div class="stack" style="margin-top: 14px;">
+            <button id="deleteVehicleButton" class="warn">Delete vehicle</button>
+          </div>
+          <div id="deleteHelp" class="muted" style="margin-top: 8px;"></div>
+        </section>
+      </div>
+
+      <section class="card" style="margin-top:16px;">
+        <h2>Recent History</h2>
+        <div id="history" class="history"></div>
+      </section>
+      <div id="status" class="status"></div>
+    </div>
+    <script type="module">
+      const state = { vehicles: [], selectedVehicleId: null };
+      const $ = (id) => document.getElementById(id);
+      const today = new Date().toISOString().slice(0, 10);
+      ["visitDate", "maintenanceDate", "recordDate"].forEach((id) => { $(id).value = today; });
+
+      async function fetchData() {
+        const response = await fetch("/api/vehicle_maintenance/ui-data", { credentials: "same-origin" });
+        const data = await response.json();
+        state.vehicles = data.vehicles || [];
+        if (!state.selectedVehicleId && state.vehicles.length) {
+          state.selectedVehicleId = state.vehicles[0].vehicle_id;
+        }
+        if (state.selectedVehicleId && !state.vehicles.some((v) => v.vehicle_id === state.selectedVehicleId)) {
+          state.selectedVehicleId = state.vehicles[0]?.vehicle_id ?? null;
+        }
+        render();
+      }
+
+      function selectedVehicle() {
+        return state.vehicles.find((vehicle) => vehicle.vehicle_id === state.selectedVehicleId) || null;
+      }
+
+      function render() {
+        const vehicle = selectedVehicle();
+        const select = $("vehicleSelect");
+        select.innerHTML = state.vehicles.map((item) =>
+          `<option value="${item.vehicle_id}" ${item.vehicle_id === state.selectedVehicleId ? "selected" : ""}>${item.vehicle.name}</option>`
+        ).join("");
+
+        if (!vehicle) {
+          $("vehicleSummary").innerHTML = "<p>No vehicles available.</p>";
+          $("vehicleDetails").innerHTML = "";
+          $("scheduledMileage").innerHTML = "";
+          $("maintenanceItem").innerHTML = "";
+          $("history").innerHTML = "";
+          return;
+        }
+
+        const badge = vehicle.is_due ? '<span class="pill overdue">Maintenance due</span>' : '<span class="pill">On track</span>';
+        $("vehicleSummary").innerHTML = `
+          <h3>${vehicle.vehicle.name}</h3>
+          <p>${vehicle.summary}</p>
+          ${badge}
+        `;
+
+        const milestones = [...new Set(vehicle.schedule_items
+          .map((item) => item.manufacturer_anchor_miles)
+          .filter((value) => value !== null)
+          .sort((a, b) => a - b))];
+        $("scheduledMileage").innerHTML = milestones
+          .map((mileage) => `<option value="${mileage}">${mileage.toLocaleString()} mi</option>`)
+          .join("");
+        $("maintenanceItem").innerHTML = vehicle.schedule_items
+          .map((item) => `<option value="${item.id}">${item.name}</option>`)
+          .join("");
+
+        $("vehicleDetails").innerHTML = `
+          <p><strong>Odometer:</strong> ${vehicle.vehicle.current_odometer.toLocaleString()} mi</p>
+          <p><strong>Warranty miles remaining:</strong> ${vehicle.warranty_miles_remaining ?? "n/a"}</p>
+          <p><strong>Warranty expiration:</strong> ${vehicle.warranty_expiration_date ?? "n/a"}</p>
+          <p><strong>Template:</strong> ${vehicle.vehicle.template_id ?? "custom"}</p>
+        `;
+        $("deleteHelp").textContent = vehicle.delete_confirmation_armed
+          ? `Delete armed until ${vehicle.delete_confirmation_armed_until}. Press again to confirm.`
+          : "First press arms deletion for 30 seconds. Press again to confirm.";
+
+        $("history").innerHTML = vehicle.recent_service_records.length
+          ? vehicle.recent_service_records.map((record) => `
+            <div class="history-item">
+              <strong>${record.title || record.item_id || "Service record"}</strong>
+              <div class="muted">${record.date} • ${record.odometer.toLocaleString()} mi • ${record.source || "source not set"}</div>
+              <div class="muted">${record.category || record.event_type}${record.notes ? " • " + record.notes : ""}</div>
+            </div>
+          `).join("")
+          : "<p>No history yet.</p>";
+      }
+
+      async function sendAction(action, data) {
+        $("status").textContent = "Saving…";
+        const response = await fetch("/api/vehicle_maintenance/ui-action", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action, data }),
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          $("status").textContent = payload.error || "Request failed";
+          return;
+        }
+        state.vehicles = payload.vehicles || [];
+        if (action === "delete_vehicle" && !state.vehicles.some((v) => v.vehicle_id === state.selectedVehicleId)) {
+          state.selectedVehicleId = state.vehicles[0]?.vehicle_id ?? null;
+        }
+        render();
+        $("status").textContent = action === "delete_vehicle" && selectedVehicle()?.delete_confirmation_armed
+          ? "Delete armed. Press again within 30 seconds to confirm."
+          : "Saved.";
+      }
+
+      $("vehicleSelect").addEventListener("change", (event) => {
+        state.selectedVehicleId = event.target.value;
+        render();
+      });
+
+      $("visitButton").addEventListener("click", async () => {
+        const vehicle = selectedVehicle();
+        if (!vehicle) return;
+        await sendAction("log_service_visit", {
+          vehicle_id: vehicle.vehicle_id,
+          date: $("visitDate").value,
+          odometer: Number($("visitOdo").value || vehicle.vehicle.current_odometer),
+          scheduled_mileage: Number($("scheduledMileage").value),
+          source: $("visitSource").value || null,
+          notes: $("visitNotes").value || "",
+        });
+      });
+
+      $("maintenanceButton").addEventListener("click", async () => {
+        const vehicle = selectedVehicle();
+        if (!vehicle) return;
+        const itemSelect = $("maintenanceItem");
+        const title = itemSelect.options[itemSelect.selectedIndex]?.textContent || itemSelect.value;
+        await sendAction("log_maintenance", {
+          vehicle_id: vehicle.vehicle_id,
+          item_id: itemSelect.value,
+          title,
+          date: $("maintenanceDate").value,
+          odometer: Number($("maintenanceOdo").value || vehicle.vehicle.current_odometer),
+          source: $("maintenanceSource").value || null,
+          notes: $("maintenanceNotes").value || "",
+        });
+      });
+
+      $("recordButton").addEventListener("click", async () => {
+        const vehicle = selectedVehicle();
+        if (!vehicle) return;
+        await sendAction("log_service_record", {
+          vehicle_id: vehicle.vehicle_id,
+          title: $("recordTitle").value,
+          category: $("recordCategory").value || null,
+          date: $("recordDate").value,
+          odometer: Number($("recordOdo").value || vehicle.vehicle.current_odometer),
+          source: $("recordSource").value || null,
+          cost: $("recordCost").value ? Number($("recordCost").value) : null,
+          notes: $("recordNotes").value || "",
+        });
+      });
+
+      $("deleteVehicleButton").addEventListener("click", async () => {
+        const vehicle = selectedVehicle();
+        if (!vehicle) return;
+        await sendAction("delete_vehicle", { vehicle_id: vehicle.vehicle_id });
+      });
+
+      fetchData();
+    </script>
+  </body>
+</html>

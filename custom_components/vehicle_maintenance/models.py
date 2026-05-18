@@ -55,9 +55,13 @@ class ServiceEvent:
 
     id: str
     vehicle_id: str
-    item_id: str
+    item_id: str | None
     date: str
     odometer: int
+    event_type: str = "maintenance_item"
+    title: str | None = None
+    category: str | None = None
+    affects_schedule: bool = False
     source: str | None = None
     scheduled_mileage: int | None = None
     service_visit_id: str | None = None
@@ -198,10 +202,14 @@ def make_service_event(data: dict[str, Any]) -> ServiceEvent:
     return ServiceEvent(
         id=uuid4().hex,
         vehicle_id=data["vehicle_id"],
-        item_id=data["item_id"],
+        item_id=data.get("item_id"),
         date=data["date"],
         odometer=int(data["odometer"]),
-        source=data.get("source"),
+        event_type=data.get("event_type", "maintenance_item"),
+        title=data.get("title"),
+        category=data.get("category"),
+        affects_schedule=bool(data.get("affects_schedule", False)),
+        source=data.get("source") or data.get("service_source"),
         scheduled_mileage=(
             int(data["scheduled_mileage"]) if data.get("scheduled_mileage") is not None else None
         ),
@@ -281,7 +289,13 @@ def calculate_due_status(
     """Calculate due state for a vehicle maintenance item."""
     reference_date = today or _today()
     item_events = sorted(
-        (event for event in events if event.vehicle_id == vehicle.id and event.item_id == item.id),
+        (
+            event
+            for event in events
+            if event.vehicle_id == vehicle.id
+            and event.item_id == item.id
+            and event.affects_schedule
+        ),
         key=lambda event: (event.odometer, event.date),
     )
     last_event = item_events[-1] if item_events else None

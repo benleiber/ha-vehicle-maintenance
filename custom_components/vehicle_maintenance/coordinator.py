@@ -20,6 +20,7 @@ from .models import (
     calculate_due_status,
     calculate_warranty_expiration_date,
     calculate_warranty_miles_remaining,
+    event_to_dict,
     get_scheduled_items_for_mileage,
     summarize_due,
     template_from_dict,
@@ -121,6 +122,18 @@ class VehicleMaintenanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "is_due": any(status.is_due for status in due_statuses),
                 "warranty_expiration_date": calculate_warranty_expiration_date(vehicle),
                 "warranty_miles_remaining": calculate_warranty_miles_remaining(vehicle),
+                "recent_service_records": [
+                    event_to_dict(event)
+                    for event in sorted(
+                        (
+                            event
+                            for event in self.store.service_events
+                            if event.vehicle_id == vehicle.id
+                        ),
+                        key=lambda item: (item.date, item.odometer, item.id),
+                        reverse=True,
+                    )[:25]
+                ],
             }
         return snapshot
 
@@ -158,6 +171,8 @@ class VehicleMaintenanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def async_log_maintenance(self, data: dict[str, Any]) -> None:
         """Log maintenance and refresh state."""
+        data.setdefault("event_type", "maintenance_item")
+        data.setdefault("affects_schedule", True)
         await self.store.async_log_maintenance(data)
         await self.async_refresh()
 
@@ -181,8 +196,21 @@ class VehicleMaintenanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             event_data = dict(data)
             event_data["item_id"] = item_id
             event_data["service_visit_id"] = service_visit_id
+            event_data["event_type"] = "maintenance_item"
+            event_data["affects_schedule"] = True
+            if not event_data.get("title"):
+                event_data["title"] = item_id
             events.append(event_data)
         await self.store.async_log_maintenance_events(events)
+        await self.async_refresh()
+
+    async def async_log_service_record(self, data: dict[str, Any]) -> None:
+        """Log an ad hoc service record that does not need a schedule item."""
+        payload = dict(data)
+        payload["event_type"] = "service_record"
+        payload["affects_schedule"] = bool(payload.get("affects_schedule", False))
+        payload.setdefault("item_id", None)
+        await self.store.async_log_maintenance(payload)
         await self.async_refresh()
 
     def get_vehicle_snapshot(self, vehicle_id: str) -> dict[str, Any]:

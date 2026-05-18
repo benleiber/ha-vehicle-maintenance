@@ -8,6 +8,8 @@ This MVP supports:
 - Storage-backed vehicles and maintenance history
 - Purchase metadata and warranty tracking
 - One-off maintenance logging and full scheduled service visit logging
+- Ad hoc service records such as flat tire repair, alignment, glass repair, warranty work, and diagnostics
+- A built-in Home Assistant panel for vehicle/service logging without YAML
 - Seed maintenance templates for:
   - 2024 Subaru Outback 2.4T
   - 2021 Mazda CX-5 2.5
@@ -25,6 +27,7 @@ The included schedules are **seed templates only** and must be verified against 
 3. Go to `Settings -> Devices & Services -> Add Integration`.
 4. Add `Vehicle Maintenance`.
 5. Use the provided services to add vehicles and log maintenance.
+6. Open the `Vehicle Maintenance` panel from the Home Assistant sidebar for the no-YAML logging UI.
 
 HACS is not required for the MVP.
 
@@ -153,6 +156,23 @@ data:
   notes: Early oil change before 30k
 ```
 
+### Log an ad hoc service record
+
+Use this for repairs or visits that should be in the vehicle history but should not reset the maintenance schedule.
+
+```yaml
+service: vehicle_maintenance.log_service_record
+data:
+  vehicle_id: YOUR_VEHICLE_ID
+  title: Flat tire repair
+  category: tire
+  date: "2026-05-18"
+  odometer: 26102
+  service_source: Discount Tire
+  notes: Patched puncture in rear tire
+  cost: 28.00
+```
+
 ### Edit a vehicle
 
 ```yaml
@@ -185,6 +205,30 @@ Per vehicle the integration exposes:
 - Per-maintenance-item due date sensors
 - Per-maintenance-item due binary sensors
 - A convenience button to log the next-due item using today's date and the current odometer
+- A sidebar panel for logging scheduled visits, one-off maintenance, and ad hoc service records
+
+## In-HA UI
+
+After installing and restarting Home Assistant, the integration registers a `Vehicle Maintenance` panel in the sidebar.
+
+From that panel you can:
+
+- Pick a vehicle from a dropdown
+- Log a complete scheduled visit by mileage milestone
+- Log a one-off maintenance item such as an early oil change
+- Log an ad hoc service record such as a flat tire repair
+- Review recent service history
+- Delete a vehicle with confirmation
+
+## Dashboard use
+
+If you want a dashboard entry point for less technical users, add an `Iframe` card to a Home Assistant dashboard and point it at:
+
+```text
+/api/vehicle_maintenance/panel
+```
+
+That gives you a dashboard tile that opens the same maintenance workflow UI without needing Developer Tools.
 
 ## Roadmap
 
