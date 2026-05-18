@@ -213,6 +213,30 @@ class VehicleMaintenanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.store.async_log_maintenance(payload)
         await self.async_refresh()
 
+    async def async_edit_service_record(self, event_id: str, updates: dict[str, Any]) -> None:
+        """Edit a previously logged service event."""
+        await self.store.async_edit_service_event(event_id, updates)
+        await self.async_refresh()
+
+    async def async_delete_service_record(self, event_id: str) -> None:
+        """Delete a previously logged service event."""
+        await self.store.async_delete_service_event(event_id)
+        await self.async_refresh()
+
+    async def async_edit_service_records(
+        self,
+        event_ids: list[str],
+        updates: dict[str, Any],
+    ) -> None:
+        """Edit multiple previously logged service events."""
+        await self.store.async_edit_service_events(event_ids, updates)
+        await self.async_refresh()
+
+    async def async_delete_service_records(self, event_ids: list[str]) -> None:
+        """Delete multiple previously logged service events."""
+        await self.store.async_delete_service_events(event_ids)
+        await self.async_refresh()
+
     def get_vehicle_snapshot(self, vehicle_id: str) -> dict[str, Any]:
         """Return computed state for a vehicle."""
         return self.data["vehicles"][vehicle_id]

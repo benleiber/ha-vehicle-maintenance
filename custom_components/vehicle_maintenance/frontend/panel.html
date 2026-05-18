@@ -51,6 +51,27 @@
       .stack { display:flex; gap:10px; flex-wrap:wrap; }
       .history { max-height: 420px; overflow:auto; }
       .history-item { border-top:1px solid var(--line); padding:10px 0; }
+      .history-head {
+        display:flex;
+        align-items:flex-start;
+        justify-content:space-between;
+        gap:12px;
+      }
+      .history-actions {
+        display:flex;
+        gap:8px;
+        flex-shrink:0;
+      }
+      .history-actions button {
+        width:auto;
+        padding:8px 10px;
+        border-radius:10px;
+        background:#f3efe4;
+        color:var(--ink);
+      }
+      .history-actions button.delete {
+        color: var(--danger);
+      }
       .muted { color: var(--muted); font-size: 0.92rem; }
       .status { margin-top: 10px; min-height: 22px; color: var(--accent); font-weight: 600; }
       .windows { display:grid; gap: 14px; margin: 14px 0; }
@@ -133,6 +154,13 @@
         padding: 10px 12px;
         background: white;
       }
+      .editor-card {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 14px;
+        background: #f7f4ec;
+        margin-bottom: 12px;
+      }
       @media (max-width: 1000px) {
         .top-grid,
         .main-grid { grid-template-columns: 1fr; }
@@ -185,7 +213,10 @@
               <label>Cost<input id="visitCost" type="number" min="0" step="0.01" /></label>
             </div>
             <label>Notes<textarea id="visitNotes"></textarea></label>
-            <button id="visitButton">Log selected work</button>
+            <div class="stack">
+              <button id="visitButton">Log selected work</button>
+              <button id="clearPaneButton" class="secondary" type="button">Clear</button>
+            </div>
           </section>
 
           <section class="card">
@@ -241,10 +272,31 @@
         vehicles: [],
         selectedVehicleId: null,
         checkedItemIds: new Set(),
+        editingRecord: null,
+        historyGroups: [],
       };
+      const INSPECTION_OPTION_ID = "__inspection__";
       const $ = (id) => document.getElementById(id);
       const today = new Date().toISOString().slice(0, 10);
       ["visitDate", "recordDate"].forEach((id) => { $(id).value = today; });
+
+      function resetPaneFormState() {
+        const vehicle = selectedVehicle();
+        state.checkedItemIds = new Set();
+        state.editingRecord = null;
+        $("visitDate").value = today;
+        $("visitOdo").value = vehicle ? vehicle.vehicle.current_odometer : "";
+        $("visitSource").value = "";
+        $("visitCost").value = "";
+        $("visitNotes").value = "";
+        $("recordTitle").value = "";
+        $("recordCategory").value = "";
+        $("recordDate").value = today;
+        $("recordOdo").value = vehicle ? vehicle.vehicle.current_odometer : "";
+        $("recordSource").value = "";
+        $("recordCost").value = "";
+        $("recordNotes").value = "";
+      }
 
       function getHass() {
         return window.parent?.document?.querySelector("home-assistant")?.hass ?? null;
@@ -263,10 +315,11 @@
         state.vehicles = data.vehicles || [];
         if (!state.selectedVehicleId && state.vehicles.length) {
           state.selectedVehicleId = state.vehicles[0].vehicle_id;
+          resetPaneFormState();
         }
         if (state.selectedVehicleId && !state.vehicles.some((v) => v.vehicle_id === state.selectedVehicleId)) {
           state.selectedVehicleId = state.vehicles[0]?.vehicle_id ?? null;
-          state.checkedItemIds = new Set();
+          resetPaneFormState();
         }
         render();
       }
@@ -281,6 +334,71 @@
         if (status.is_due) return '<span class="pill due">Due now</span>';
         if (status.is_due_soon) return '<span class="pill due">Due soon</span>';
         return '<span class="pill">Upcoming</span>';
+      }
+
+      function groupHistoryRecords(records) {
+        const byDate = new Map();
+        for (const record of records) {
+          const dateKey = record.date;
+          if (!byDate.has(dateKey)) {
+            byDate.set(dateKey, []);
+          }
+          byDate.get(dateKey).push(record);
+        }
+
+        const groupedDates = [...byDate.entries()]
+          .sort((a, b) => b[0].localeCompare(a[0]))
+          .map(([dateKey, dateRecords]) => {
+            const groupMap = new Map();
+            for (const record of dateRecords) {
+              const typeLabel = record.event_type === "service_record" ? "adhoc" : "service";
+              const groupingKey = record.service_visit_id || `${typeLabel}_${record.id}`;
+              if (!groupMap.has(groupingKey)) {
+                groupMap.set(groupingKey, {
+                  group_key: groupingKey,
+                  type: typeLabel,
+                  category: record.category || null,
+                  title: record.title || null,
+                  date: record.date,
+                  odometer: record.odometer,
+                  source: record.source || null,
+                  cost: record.cost ?? null,
+                  notes: record.notes || "",
+                  event_ids: [],
+                  performed: [],
+                });
+              }
+              const group = groupMap.get(groupingKey);
+              group.event_ids.push(record.id);
+              group.performed.push(record.title || record.item_id || "Service record");
+            }
+
+            const serviceGroups = [];
+            const adhocGroups = [];
+            for (const group of groupMap.values()) {
+              if (group.type === "service") {
+                serviceGroups.push(group);
+              } else {
+                adhocGroups.push(group);
+              }
+            }
+            serviceGroups.sort((a, b) => b.odometer - a.odometer);
+            adhocGroups.sort((a, b) => b.odometer - a.odometer);
+
+            serviceGroups.forEach((group, index) => {
+              group.display_title = `Service ${index + 1}`;
+            });
+            adhocGroups.forEach((group, index) => {
+              group.display_title = `Ad Hoc ${index + 1}`;
+            });
+
+            return {
+              date: dateKey,
+              groups: [...serviceGroups, ...adhocGroups],
+            };
+          });
+
+        return groupedDates;
       }
 
       function windowMarkup(window, emphasize = false) {
@@ -305,6 +423,16 @@
             </label>
           `;
         }).join("");
+        const inspectionMarkup = window.label === "current" ? `
+          <label class="check">
+            <input type="checkbox" data-item-id="${INSPECTION_OPTION_ID}" ${state.checkedItemIds.has(INSPECTION_OPTION_ID) ? "checked" : ""} />
+            <div>
+              <div class="check-title">Inspection</div>
+              <div class="muted">Log a general inspection performed during this visit.</div>
+              <div class="stack"><span class="pill">Optional</span></div>
+            </div>
+          </label>
+        ` : "";
         return `
           <div class="${currentClass}">
             <div class="window-head">
@@ -313,7 +441,7 @@
               </div>
               ${window.label === "current" ? '<span class="pill current">Focus window</span>' : ""}
             </div>
-            <div class="checklist">${items || "<p>No items in this window.</p>"}</div>
+            <div class="checklist">${inspectionMarkup}${items || "<p>No items in this window.</p>"}</div>
           </div>
         `;
       }
@@ -394,15 +522,111 @@
 
         renderServiceWindows(vehicle);
 
-        $("history").innerHTML = vehicle.recent_service_records.length
-          ? vehicle.recent_service_records.map((record) => `
+        const editorMarkup = state.editingRecord ? `
+          <div class="editor-card">
+            <h3>Edit History Entry</h3>
+            <div class="row">
+              <label>Title<input id="editTitle" value="${state.editingRecord.title || ""}" /></label>
+              <label>Category<input id="editCategory" value="${state.editingRecord.category || ""}" /></label>
+            </div>
+            <div class="row">
+              <label>Date<input id="editDate" type="date" value="${state.editingRecord.date}" /></label>
+              <label>Odometer<input id="editOdometer" type="number" min="0" value="${state.editingRecord.odometer}" /></label>
+            </div>
+            <div class="row">
+              <label>Source<input id="editSource" value="${state.editingRecord.source || ""}" /></label>
+              <label>Cost<input id="editCost" type="number" min="0" step="0.01" value="${state.editingRecord.cost ?? ""}" /></label>
+            </div>
+            <label>Notes<textarea id="editNotes">${state.editingRecord.notes || ""}</textarea></label>
+            <div class="stack">
+              <button id="saveEditButton" type="button">Save changes</button>
+              <button id="cancelEditButton" class="secondary" type="button">Cancel</button>
+            </div>
+          </div>
+        ` : "";
+
+        const groupedHistory = groupHistoryRecords(vehicle.recent_service_records);
+        state.historyGroups = groupedHistory.flatMap((dateGroup) => dateGroup.groups);
+        $("history").innerHTML = editorMarkup + (groupedHistory.length
+          ? groupedHistory.map((dateGroup) => `
             <div class="history-item">
-              <strong>${record.title || record.item_id || "Service record"}</strong>
-              <div class="muted">${record.date} | ${record.odometer.toLocaleString()} mi | ${record.source || "source not set"}</div>
-              <div class="muted">${record.category || record.event_type}${record.notes ? " | " + record.notes : ""}</div>
+              <strong>${dateGroup.date}</strong>
+              ${dateGroup.groups.map((group) => {
+                const groupIndex = state.historyGroups.findIndex((item) => item.group_key === group.group_key);
+                return `
+                <div class="history-item">
+                  <div class="history-head">
+                    <div>
+                      <strong>${group.display_title}</strong>
+                      <div class="muted">${group.odometer.toLocaleString()} mi | ${group.source || "source not set"}</div>
+                      <div class="muted">${group.notes || group.category || group.type}</div>
+                      <div class="muted">Performed: ${group.performed.join(", ")}</div>
+                    </div>
+                    <div class="history-actions">
+                      <button type="button" data-group-index="${groupIndex}">Edit</button>
+                      <button type="button" class="delete" data-group-delete-index="${groupIndex}">Delete</button>
+                    </div>
+                  </div>
+                </div>
+              `;}).join("")}
             </div>
           `).join("")
-          : "<p>No history yet.</p>";
+          : "<p>No history yet.</p>");
+
+        document.querySelectorAll("button[data-group-index]").forEach((button) => {
+          button.addEventListener("click", () => {
+            state.editingRecord = state.historyGroups[Number(button.dataset.groupIndex)] || null;
+            render();
+          });
+        });
+
+        document.querySelectorAll("button[data-group-delete-index]").forEach((button) => {
+          button.addEventListener("click", async () => {
+            const group = state.historyGroups[Number(button.dataset.groupDeleteIndex)];
+            const eventIds = group?.event_ids || [];
+            if (eventIds.length === 1) {
+              await sendAction("delete_service_record", { event_id: eventIds[0] });
+            } else {
+              await sendAction("delete_service_records", { event_ids: eventIds });
+            }
+            if (state.editingRecord && eventIds.some((id) => state.editingRecord.event_ids?.includes(id))) {
+              state.editingRecord = null;
+            }
+          });
+        });
+
+        if ($("saveEditButton")) {
+          $("saveEditButton").addEventListener("click", async () => {
+            if (!state.editingRecord) return;
+            const action = state.editingRecord.event_ids?.length > 1
+              ? "edit_service_records"
+              : "edit_service_record";
+            const payload = state.editingRecord.event_ids?.length > 1
+              ? { event_ids: state.editingRecord.event_ids }
+              : { event_id: state.editingRecord.event_ids[0] };
+            await sendAction(action, {
+              ...payload,
+              updates: {
+                title: $("editTitle").value || null,
+                category: $("editCategory").value || null,
+                date: $("editDate").value,
+                odometer: Number($("editOdometer").value),
+                source: $("editSource").value || null,
+                cost: $("editCost").value ? Number($("editCost").value) : null,
+                notes: $("editNotes").value || "",
+              },
+            });
+            state.editingRecord = null;
+            render();
+          });
+        }
+
+        if ($("cancelEditButton")) {
+          $("cancelEditButton").addEventListener("click", () => {
+            state.editingRecord = null;
+            render();
+          });
+        }
       }
 
       async function sendAction(action, data) {
@@ -413,6 +637,7 @@
           if (action === "delete_vehicle" && !state.vehicles.some((v) => v.vehicle_id === state.selectedVehicleId)) {
             state.selectedVehicleId = state.vehicles[0]?.vehicle_id ?? null;
             state.checkedItemIds = new Set();
+            state.editingRecord = null;
           }
           render();
           $("status").textContent = action === "delete_vehicle" && selectedVehicle()?.delete_confirmation_armed
@@ -425,28 +650,43 @@
 
       $("vehicleSelect").addEventListener("change", (event) => {
         state.selectedVehicleId = event.target.value;
-        state.checkedItemIds = new Set();
+        resetPaneFormState();
         render();
       });
 
       $("visitButton").addEventListener("click", async () => {
         const vehicle = selectedVehicle();
         if (!vehicle) return;
-        const itemIds = [...state.checkedItemIds];
-        if (!itemIds.length) {
+        const checkedIds = [...state.checkedItemIds];
+        const includesInspection = checkedIds.includes(INSPECTION_OPTION_ID);
+        const itemIds = checkedIds.filter((itemId) => itemId !== INSPECTION_OPTION_ID);
+        if (!itemIds.length && !includesInspection) {
           $("status").textContent = "Select at least one completed item.";
           return;
         }
-        await sendAction("log_service_visit", {
+        const sharedData = {
           vehicle_id: vehicle.vehicle_id,
-          item_ids: itemIds,
           date: $("visitDate").value,
           odometer: Number($("visitOdo").value || vehicle.vehicle.current_odometer),
           cost: $("visitCost").value ? Number($("visitCost").value) : null,
           source: $("visitSource").value || null,
           notes: $("visitNotes").value || "",
-        });
-        state.checkedItemIds = new Set();
+        };
+        if (itemIds.length) {
+          await sendAction("log_service_visit", {
+            ...sharedData,
+            item_ids: itemIds,
+          });
+        }
+        if (includesInspection) {
+          await sendAction("log_service_record", {
+            ...sharedData,
+            title: "Inspection",
+            category: "inspection",
+          });
+        }
+        resetPaneFormState();
+        render();
       });
 
       $("recordButton").addEventListener("click", async () => {
@@ -462,6 +702,8 @@
           cost: $("recordCost").value ? Number($("recordCost").value) : null,
           notes: $("recordNotes").value || "",
         });
+        resetPaneFormState();
+        render();
       });
 
       $("deleteVehicleButton").addEventListener("click", async () => {
@@ -472,6 +714,12 @@
 
       $("snapshotMenuButton").addEventListener("click", () => {
         $("snapshotMenu").classList.toggle("open");
+      });
+
+      $("clearPaneButton").addEventListener("click", () => {
+        resetPaneFormState();
+        render();
+        $("status").textContent = "Cleared.";
       });
 
       document.addEventListener("click", (event) => {

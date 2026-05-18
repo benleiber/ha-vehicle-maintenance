@@ -111,3 +111,47 @@ class VehicleMaintenanceStore:
         self.service_events.extend(events)
         await self.async_save()
         return events
+
+    async def async_edit_service_event(
+        self,
+        event_id: str,
+        updates: dict[str, Any],
+    ) -> ServiceEvent:
+        """Edit a stored service event."""
+        for index, event in enumerate(self.service_events):
+            if event.id != event_id:
+                continue
+            current = deepcopy(event_to_dict(event))
+            current.update(updates)
+            current["id"] = event.id
+            updated = event_from_dict(current)
+            self.service_events[index] = updated
+            await self.async_save()
+            return updated
+        msg = f"Unknown service event {event_id}"
+        raise KeyError(msg)
+
+    async def async_delete_service_event(self, event_id: str) -> None:
+        """Delete a stored service event."""
+        before_count = len(self.service_events)
+        self.service_events = [event for event in self.service_events if event.id != event_id]
+        if len(self.service_events) == before_count:
+            msg = f"Unknown service event {event_id}"
+            raise KeyError(msg)
+        await self.async_save()
+
+    async def async_edit_service_events(
+        self,
+        event_ids: list[str],
+        updates: dict[str, Any],
+    ) -> list[ServiceEvent]:
+        """Edit multiple stored service events with shared updates."""
+        updated_events: list[ServiceEvent] = []
+        for event_id in event_ids:
+            updated_events.append(await self.async_edit_service_event(event_id, updates))
+        return updated_events
+
+    async def async_delete_service_events(self, event_ids: list[str]) -> None:
+        """Delete multiple stored service events."""
+        for event_id in event_ids:
+            await self.async_delete_service_event(event_id)

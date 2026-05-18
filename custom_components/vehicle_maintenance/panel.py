@@ -168,6 +168,20 @@ class VehicleMaintenancePanelActionView(HomeAssistantView):
             await coordinator.async_log_maintenance(payload["data"])
         elif action == "log_service_record":
             await coordinator.async_log_service_record(payload["data"])
+        elif action == "edit_service_record":
+            await coordinator.async_edit_service_record(
+                payload["data"]["event_id"],
+                payload["data"]["updates"],
+            )
+        elif action == "edit_service_records":
+            await coordinator.async_edit_service_records(
+                payload["data"]["event_ids"],
+                payload["data"]["updates"],
+            )
+        elif action == "delete_service_record":
+            await coordinator.async_delete_service_record(payload["data"]["event_id"])
+        elif action == "delete_service_records":
+            await coordinator.async_delete_service_records(payload["data"]["event_ids"])
         elif action == "delete_vehicle":
             vehicle_id = payload["data"]["vehicle_id"]
             if not coordinator.is_delete_armed(vehicle_id):
