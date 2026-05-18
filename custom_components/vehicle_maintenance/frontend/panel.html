@@ -90,6 +90,7 @@
       }
       .muted { color: var(--muted); font-size: 0.92rem; }
       .status { margin-top: 10px; min-height: 22px; color: var(--accent); font-weight: 600; }
+      .page-shell[hidden] { display: none; }
       .windows { display:grid; gap: 14px; margin: 14px 0; }
       .window {
         border: 1px solid var(--line);
@@ -239,6 +240,16 @@
         font-size: 0.88rem;
         color: var(--muted);
       }
+      .toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      .toolbar button {
+        width: auto;
+      }
       @media (max-width: 1000px) {
         .top-grid,
         .main-grid { grid-template-columns: 1fr; }
@@ -271,6 +282,8 @@
               <button id="snapshotMenuButton" class="menu-trigger" aria-label="Vehicle actions">&#8942;</button>
               <div id="snapshotMenu" class="menu">
                 <button id="editVehicleButton" type="button">Edit vehicle</button>
+                <button id="viewVehicleHistoryButton" type="button">View history</button>
+                <button id="importVehicleButton" type="button">Import vehicle</button>
                 <button id="exportVehicleHistoryButton" type="button">Export vehicle history</button>
                 <button id="deleteVehicleButton" class="delete-action" type="button">Delete vehicle</button>
               </div>
@@ -282,70 +295,87 @@
 
       <section id="vehicleEditor" class="card editor-shell" hidden></section>
 
-      <div class="main-grid">
-        <div class="form-stack">
-          <section class="card">
-            <h2>Log Vehicle Service</h2>
-            <p>Check off exactly what was done on this visit.</p>
+      <input id="importVehicleFile" type="file" accept="application/json" hidden />
+
+      <div id="dashboardPage" class="page-shell">
+        <div class="main-grid">
+          <div class="form-stack">
+            <section class="card">
+              <h2>Log Vehicle Service</h2>
+              <p>Check off exactly what was done on this visit.</p>
+              <div class="row">
+                <label>Date<input id="visitDate" type="date" /></label>
+                <label>Odometer<input id="visitOdo" type="number" min="0" /></label>
+              </div>
+              <div class="row">
+                <label>Source<input id="visitSource" placeholder="dealer or self" /></label>
+                <label>Cost<input id="visitCost" type="number" min="0" step="0.01" /></label>
+              </div>
+              <label>Notes<textarea id="visitNotes"></textarea></label>
+              <div class="stack">
+                <button id="visitButton">Log selected work</button>
+                <button id="clearPaneButton" class="secondary" type="button">Clear</button>
+              </div>
+            </section>
+
+            <section class="card">
+            <h2>Ad Hoc Service Record</h2>
+            <p>Use this for work like a flat tire repair, alignment, diagnostic visit, warranty repair, or glass replacement.</p>
             <div class="row">
-              <label>Date<input id="visitDate" type="date" /></label>
-              <label>Odometer<input id="visitOdo" type="number" min="0" /></label>
+              <label>Title<input id="recordTitle" placeholder="Flat tire repair" /></label>
+              <label>Category<input id="recordCategory" placeholder="tire" /></label>
             </div>
             <div class="row">
-              <label>Source<input id="visitSource" placeholder="dealer or self" /></label>
-              <label>Cost<input id="visitCost" type="number" min="0" step="0.01" /></label>
+              <label>Date<input id="recordDate" type="date" /></label>
+              <label>Odometer<input id="recordOdo" type="number" min="0" /></label>
             </div>
-            <label>Notes<textarea id="visitNotes"></textarea></label>
-            <div class="stack">
-              <button id="visitButton">Log selected work</button>
-              <button id="clearPaneButton" class="secondary" type="button">Clear</button>
+            <div class="row">
+              <label>Source<input id="recordSource" placeholder="discount tire" /></label>
+              <label>Cost<input id="recordCost" type="number" min="0" step="0.01" /></label>
             </div>
-          </section>
+            <label>Notes<textarea id="recordNotes"></textarea></label>
+            <button id="recordButton" class="secondary">Log service record</button>
+            </section>
+          </div>
 
-          <section class="card">
-          <h2>Ad Hoc Service Record</h2>
-          <p>Use this for work like a flat tire repair, alignment, diagnostic visit, warranty repair, or glass replacement.</p>
-          <div class="row">
-            <label>Title<input id="recordTitle" placeholder="Flat tire repair" /></label>
-            <label>Category<input id="recordCategory" placeholder="tire" /></label>
+          <div class="window-stack">
+            <section class="card">
+              <h2>Current</h2>
+              <p>The main service window around the current odometer.</p>
+              <div id="currentWindow"></div>
+            </section>
+
+            <section class="card">
+              <h2>Previous</h2>
+              <p>What should have been done last time.</p>
+              <div id="previousWindow"></div>
+            </section>
+
+            <section class="card">
+              <h2>Next</h2>
+              <p>What is coming up after the current service.</p>
+              <div id="nextWindow"></div>
+            </section>
+
+            <section class="card">
+              <h2>Recent History</h2>
+              <div id="history" class="history"></div>
+            </section>
           </div>
-          <div class="row">
-            <label>Date<input id="recordDate" type="date" /></label>
-            <label>Odometer<input id="recordOdo" type="number" min="0" /></label>
-          </div>
-          <div class="row">
-            <label>Source<input id="recordSource" placeholder="discount tire" /></label>
-            <label>Cost<input id="recordCost" type="number" min="0" step="0.01" /></label>
-          </div>
-          <label>Notes<textarea id="recordNotes"></textarea></label>
-          <button id="recordButton" class="secondary">Log service record</button>
-          </section>
         </div>
+      </div>
 
-        <div class="window-stack">
-          <section class="card">
-            <h2>Current</h2>
-            <p>The main service window around the current odometer.</p>
-            <div id="currentWindow"></div>
-          </section>
-
-          <section class="card">
-            <h2>Previous</h2>
-            <p>What should have been done last time.</p>
-            <div id="previousWindow"></div>
-          </section>
-
-          <section class="card">
-            <h2>Next</h2>
-            <p>What is coming up after the current service.</p>
-            <div id="nextWindow"></div>
-          </section>
-
-          <section class="card">
-            <h2>Recent History</h2>
-            <div id="history" class="history"></div>
-          </section>
-        </div>
+      <div id="historyPage" class="page-shell" hidden>
+        <section class="card">
+          <div class="toolbar">
+            <div>
+              <h2>Vehicle History</h2>
+              <p>Full exported record for the selected vehicle.</p>
+            </div>
+            <button id="backToDashboardButton" class="secondary" type="button">Back to dashboard</button>
+          </div>
+          <div id="fullHistory" class="history"></div>
+        </section>
       </div>
 
       <div id="status" class="status"></div>
@@ -355,6 +385,7 @@
         templates: {},
         vehicles: [],
         selectedVehicleId: null,
+        currentPage: "dashboard",
         checkedItemIds: new Set(),
         editingVehicle: null,
         editingRecord: null,
@@ -616,6 +647,31 @@
           });
 
         return groupedDates;
+      }
+
+      function renderHistoryList(targetId, records, emptyText) {
+        const groupedHistory = groupHistoryRecords(records);
+        const markup = groupedHistory.length
+          ? groupedHistory.map((dateGroup) => `
+            <div class="history-item">
+              <strong>${dateGroup.date}</strong>
+              ${dateGroup.groups.map((group) => `
+                <div class="history-item">
+                  <div class="history-head">
+                    <div>
+                      <strong>${group.display_title}</strong>
+                      <div class="muted">${group.odometer.toLocaleString()} mi | ${group.source || "source not set"}</div>
+                      <div class="muted">${group.notes || group.category || group.type}</div>
+                      <div class="muted">Performed: ${group.performed.join(", ")}</div>
+                      ${group.cost != null ? `<div class="muted">Cost: ${formatCurrency(group.cost)}</div>` : ""}
+                    </div>
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          `).join("")
+          : `<p>${emptyText}</p>`;
+        $(targetId).innerHTML = markup;
       }
 
       function renderVehicleEditor(vehicle) {
@@ -924,8 +980,12 @@
           $("previousWindow").innerHTML = "";
           $("nextWindow").innerHTML = "";
           $("history").innerHTML = "";
+          $("fullHistory").innerHTML = "";
           return;
         }
+
+        $("dashboardPage").hidden = state.currentPage !== "dashboard";
+        $("historyPage").hidden = state.currentPage !== "history";
 
         const badge = vehicle.is_due ? '<span class="pill overdue">Maintenance due</span>' : '<span class="pill">On track</span>';
         $("vehicleSummary").innerHTML = `
@@ -977,6 +1037,7 @@
 
         renderVehicleEditor(vehicle);
         renderServiceWindows(vehicle);
+        renderHistoryList("fullHistory", vehicle.all_service_records || [], "No history yet.");
 
         const editorMarkup = state.editingRecord ? `
           <div class="editor-card">
@@ -1091,6 +1152,9 @@
           const payload = await callApi("POST", "vehicle_maintenance/ui-action", { action, data });
           state.templates = payload.templates || state.templates;
           state.vehicles = payload.vehicles || [];
+          if (payload.imported_vehicle_id) {
+            state.selectedVehicleId = payload.imported_vehicle_id;
+          }
           if (action === "edit_vehicle") {
             resetPaneFormState();
           }
@@ -1179,20 +1243,26 @@
         $("snapshotMenu").classList.remove("open");
       });
 
+      $("viewVehicleHistoryButton").addEventListener("click", () => {
+        state.currentPage = "history";
+        $("snapshotMenu").classList.remove("open");
+        render();
+      });
+
+      $("backToDashboardButton").addEventListener("click", () => {
+        state.currentPage = "dashboard";
+        render();
+      });
+
       $("exportVehicleHistoryButton").addEventListener("click", () => {
         const vehicle = selectedVehicle();
         if (!vehicle) return;
         const exportPayload = {
+          format: "vehicle_maintenance_vehicle_package",
+          version: 1,
           exported_at: new Date().toISOString(),
           vehicle: vehicle.vehicle,
-          summary: vehicle.summary,
-          total_maintenance_cost: vehicle.total_maintenance_cost,
-          warranty_expiration_date: vehicle.warranty_expiration_date,
-          warranty_miles_remaining: vehicle.warranty_miles_remaining,
-          subscription_statuses: vehicle.subscription_statuses,
-          schedule_items: vehicle.schedule_items,
-          service_windows: vehicle.service_windows,
-          recent_service_records: vehicle.recent_service_records,
+          service_events: vehicle.all_service_records || [],
         };
         const blob = new Blob([JSON.stringify(exportPayload, null, 2)], {
           type: "application/json",
@@ -1211,6 +1281,33 @@
         URL.revokeObjectURL(objectUrl);
         $("snapshotMenu").classList.remove("open");
         $("status").textContent = "Vehicle history exported.";
+      });
+
+      $("importVehicleButton").addEventListener("click", () => {
+        $("snapshotMenu").classList.remove("open");
+        $("importVehicleFile").click();
+      });
+
+      $("importVehicleFile").addEventListener("change", async (event) => {
+        const [file] = event.target.files || [];
+        if (!file) {
+          return;
+        }
+        try {
+          const packageData = JSON.parse(await file.text());
+          if (!packageData?.vehicle || !Array.isArray(packageData?.service_events)) {
+            throw new Error("Invalid vehicle package");
+          }
+          await sendAction("import_vehicle", { package: packageData });
+          state.currentPage = "dashboard";
+          resetPaneFormState();
+          render();
+          $("status").textContent = "Vehicle imported.";
+        } catch (error) {
+          $("status").textContent = error?.message || "Import failed";
+        } finally {
+          event.target.value = "";
+        }
       });
 
       $("snapshotMenuButton").addEventListener("click", () => {

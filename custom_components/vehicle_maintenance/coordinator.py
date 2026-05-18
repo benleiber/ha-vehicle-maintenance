@@ -144,6 +144,18 @@ class VehicleMaintenanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         reverse=True,
                     )[:25]
                 ],
+                "all_service_records": [
+                    event_to_dict(event)
+                    for event in sorted(
+                        (
+                            event
+                            for event in self.store.service_events
+                            if event.vehicle_id == vehicle.id
+                        ),
+                        key=lambda item: (item.date, item.odometer, item.id),
+                        reverse=True,
+                    )
+                ],
             }
         return snapshot
 
@@ -246,6 +258,13 @@ class VehicleMaintenanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Delete multiple previously logged service events."""
         await self.store.async_delete_service_events(event_ids)
         await self.async_refresh()
+
+    async def async_import_vehicle_package(self, package: dict[str, Any]) -> Vehicle:
+        """Import a full vehicle package and refresh state."""
+        vehicle = await self.store.async_import_vehicle_package(package)
+        self._setup_entity_listener()
+        await self.async_refresh()
+        return vehicle
 
     def get_vehicle_snapshot(self, vehicle_id: str) -> dict[str, Any]:
         """Return computed state for a vehicle."""

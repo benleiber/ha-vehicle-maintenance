@@ -100,6 +100,7 @@ def _serialize_vehicle_panel_data(coordinator) -> dict[str, Any]:
                 "schedule_items": schedule_items,
                 "service_windows": service_windows,
                 "recent_service_records": snapshot["recent_service_records"],
+                "all_service_records": snapshot["all_service_records"],
                 "delete_confirmation_armed": coordinator.is_delete_armed(vehicle_id),
                 "delete_confirmation_armed_until": coordinator.get_delete_armed_until(vehicle_id),
             }
@@ -163,6 +164,7 @@ class VehicleMaintenancePanelActionView(HomeAssistantView):
 
         payload = await request.json()
         action = payload.get("action")
+        response_payload: dict[str, Any] = {}
 
         if action == "log_service_visit":
             await coordinator.async_log_service_visit(payload["data"])
@@ -175,6 +177,9 @@ class VehicleMaintenancePanelActionView(HomeAssistantView):
                 payload["data"]["vehicle_id"],
                 payload["data"]["updates"],
             )
+        elif action == "import_vehicle":
+            vehicle = await coordinator.async_import_vehicle_package(payload["data"]["package"])
+            response_payload["imported_vehicle_id"] = vehicle.id
         elif action == "edit_service_record":
             await coordinator.async_edit_service_record(
                 payload["data"]["event_id"],
@@ -198,4 +203,5 @@ class VehicleMaintenancePanelActionView(HomeAssistantView):
         else:
             return web.json_response({"error": f"Unsupported action {action}"}, status=400)
 
-        return web.json_response(_serialize_vehicle_panel_data(coordinator))
+        response_payload.update(_serialize_vehicle_panel_data(coordinator))
+        return web.json_response(response_payload)

@@ -155,3 +155,28 @@ class VehicleMaintenanceStore:
         """Delete multiple stored service events."""
         for event_id in event_ids:
             await self.async_delete_service_event(event_id)
+
+    async def async_import_vehicle_package(self, package: dict[str, Any]) -> Vehicle:
+        """Import a full vehicle profile plus its service history."""
+        vehicle_payload = deepcopy(package["vehicle"])
+        imported_events = [deepcopy(event) for event in package.get("service_events", [])]
+
+        original_vehicle_id = vehicle_payload.get("id")
+        vehicle_payload.pop("id", None)
+        vehicle = make_vehicle(vehicle_payload, None)
+        self.vehicles[vehicle.id] = vehicle
+
+        normalized_events: list[ServiceEvent] = []
+        for event_payload in imported_events:
+            event_payload["vehicle_id"] = vehicle.id
+            if original_vehicle_id and event_payload.get("service_visit_id"):
+                event_payload["service_visit_id"] = str(event_payload["service_visit_id"]).replace(
+                    original_vehicle_id,
+                    vehicle.id,
+                    1,
+                )
+            normalized_events.append(event_from_dict(event_payload))
+
+        self.service_events.extend(normalized_events)
+        await self.async_save()
+        return vehicle
