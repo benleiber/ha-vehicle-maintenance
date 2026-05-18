@@ -27,8 +27,11 @@
       }
       .app { max-width: 1180px; margin: 0 auto; padding: 20px; }
       .hero, .card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; }
-      .hero { padding: 20px; margin-bottom: 16px; box-shadow: 0 8px 30px rgba(31, 41, 51, 0.08); }
-      .grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr); }
+      .hero { padding: 20px; box-shadow: 0 8px 30px rgba(31, 41, 51, 0.08); }
+      .top-grid { display:grid; gap:16px; grid-template-columns: minmax(0, 1fr) minmax(320px, 1fr); margin-bottom:16px; }
+      .main-grid { display:grid; gap:16px; grid-template-columns: minmax(360px, 0.95fr) minmax(0, 1.25fr); }
+      .form-stack { display:grid; gap:16px; align-content:start; }
+      .window-stack { display:grid; gap:16px; align-content:start; }
       .card { padding: 16px; }
       h1, h2, h3 { margin: 0 0 10px; }
       p { margin: 0 0 10px; color: var(--muted); }
@@ -83,54 +86,109 @@
         background: var(--accent-soft);
         margin-top: 12px;
       }
-      @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+      .card-head {
+        display:flex;
+        align-items:flex-start;
+        justify-content:space-between;
+        gap:10px;
+      }
+      .menu-wrap { position: relative; }
+      .menu-trigger {
+        width: 40px;
+        min-width: 40px;
+        padding: 8px 0;
+        border-radius: 999px;
+        background: #f3efe4;
+        color: var(--ink);
+        border: 1px solid var(--line);
+      }
+      .menu {
+        position:absolute;
+        right:0;
+        top:46px;
+        width: 220px;
+        padding: 8px;
+        border-radius: 14px;
+        border: 1px solid var(--line);
+        background: white;
+        box-shadow: 0 10px 30px rgba(31, 41, 51, 0.12);
+        display:none;
+        z-index: 5;
+      }
+      .menu.open { display:block; }
+      .menu button {
+        text-align:left;
+        background: transparent;
+        color: var(--danger);
+        border: none;
+        padding: 10px 12px;
+      }
+      .window-summary-grid {
+        display:grid;
+        gap: 10px;
+      }
+      .window-summary-item {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 10px 12px;
+        background: white;
+      }
+      @media (max-width: 1000px) {
+        .top-grid,
+        .main-grid { grid-template-columns: 1fr; }
+      }
       @media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
     </style>
   </head>
   <body>
     <div class="app">
-      <div class="hero">
-        <h1>Vehicle Maintenance</h1>
-        <p>Pick a vehicle, review the last, current, and next service windows, and check off exactly what was done.</p>
-        <div class="row">
+      <div class="top-grid">
+        <section class="hero">
+          <h1>Vehicle Maintenance</h1>
+          <p>Pick a vehicle, review what should have been done last time, what is due now, and what is next.</p>
           <label>
             Vehicle
             <select id="vehicleSelect"></select>
           </label>
           <div id="vehicleSummary"></div>
-        </div>
-      </div>
-
-      <div class="grid">
-        <section class="card">
-          <h2>Log Service Visit</h2>
-          <p>Check off the items that were actually completed. This combines scheduled and early maintenance into one visit flow.</p>
-          <div class="row">
-            <label>Date<input id="visitDate" type="date" /></label>
-            <label>Odometer<input id="visitOdo" type="number" min="0" /></label>
-          </div>
-          <div class="row">
-            <label>Source<input id="visitSource" placeholder="dealer or self" /></label>
-            <label>Cost<input id="visitCost" type="number" min="0" step="0.01" /></label>
-          </div>
-          <label>Notes<textarea id="visitNotes"></textarea></label>
-          <div id="serviceWindows" class="windows"></div>
-          <button id="visitButton">Log selected work</button>
         </section>
 
         <section class="card">
-          <h2>Vehicle Snapshot</h2>
+          <div class="card-head">
+            <div>
+              <h2>Vehicle Snapshot</h2>
+            </div>
+            <div class="menu-wrap">
+              <button id="snapshotMenuButton" class="menu-trigger" aria-label="Vehicle actions">⋯</button>
+              <div id="snapshotMenu" class="menu">
+                <button id="deleteVehicleButton" type="button">Delete vehicle</button>
+              </div>
+            </div>
+          </div>
           <div id="vehicleDetails"></div>
           <div class="summary-box" id="windowSummary"></div>
-          <div class="stack" style="margin-top: 14px;">
-            <button id="deleteVehicleButton" class="warn">Delete vehicle</button>
-          </div>
           <div id="deleteHelp" class="muted" style="margin-top: 8px;"></div>
         </section>
       </div>
 
-      <div class="grid" style="margin-top: 16px;">
-        <section class="card">
+      <div class="main-grid">
+        <div class="form-stack">
+          <section class="card">
+            <h2>Log Vehicle Service</h2>
+            <p>Check off exactly what was done on this visit.</p>
+            <div class="row">
+              <label>Date<input id="visitDate" type="date" /></label>
+              <label>Odometer<input id="visitOdo" type="number" min="0" /></label>
+            </div>
+            <div class="row">
+              <label>Source<input id="visitSource" placeholder="dealer or self" /></label>
+              <label>Cost<input id="visitCost" type="number" min="0" step="0.01" /></label>
+            </div>
+            <label>Notes<textarea id="visitNotes"></textarea></label>
+            <button id="visitButton">Log selected work</button>
+          </section>
+
+          <section class="card">
           <h2>Ad Hoc Service Record</h2>
           <p>Use this for work like a flat tire repair, alignment, diagnostic visit, warranty repair, or glass replacement.</p>
           <div class="row">
@@ -147,12 +205,33 @@
           </div>
           <label>Notes<textarea id="recordNotes"></textarea></label>
           <button id="recordButton" class="secondary">Log service record</button>
-        </section>
+          </section>
+        </div>
 
-        <section class="card">
-          <h2>Recent History</h2>
-          <div id="history" class="history"></div>
-        </section>
+        <div class="window-stack">
+          <section class="card">
+            <h2>Current</h2>
+            <p>The main service window around the current odometer.</p>
+            <div id="currentWindow"></div>
+          </section>
+
+          <section class="card">
+            <h2>Previous</h2>
+            <p>What should have been done last time.</p>
+            <div id="previousWindow"></div>
+          </section>
+
+          <section class="card">
+            <h2>Next</h2>
+            <p>What is coming up after the current service.</p>
+            <div id="nextWindow"></div>
+          </section>
+
+          <section class="card">
+            <h2>Recent History</h2>
+            <div id="history" class="history"></div>
+          </section>
+        </div>
       </div>
 
       <div id="status" class="status"></div>
@@ -204,52 +283,66 @@
         return '<span class="pill">Upcoming</span>';
       }
 
+      function windowMarkup(window, emphasize = false) {
+        if (!window) {
+          return "<p>No window available.</p>";
+        }
+        const currentClass = emphasize ? "window current" : "window";
+        const items = window.items.map((item) => {
+          const checked = state.checkedItemIds.has(item.id) ? "checked" : "";
+          const dueBadge = badgeForStatus(item.due_status);
+          const lastDone = item.due_status?.last_service_odometer
+            ? `Last done at ${item.due_status.last_service_odometer.toLocaleString()} mi`
+            : "No logged service yet";
+          return `
+            <label class="check">
+              <input type="checkbox" data-item-id="${item.id}" ${checked} />
+              <div>
+                <div class="check-title">${item.name}</div>
+                <div class="muted">${lastDone}</div>
+                <div class="stack">${dueBadge}</div>
+              </div>
+            </label>
+          `;
+        }).join("");
+        return `
+          <div class="${currentClass}">
+            <div class="window-head">
+              <div>
+                <h3>${window.scheduled_mileage.toLocaleString()} miles</h3>
+              </div>
+              ${window.label === "current" ? '<span class="pill current">Focus window</span>' : ""}
+            </div>
+            <div class="checklist">${items || "<p>No items in this window.</p>"}</div>
+          </div>
+        `;
+      }
+
       function renderServiceWindows(vehicle) {
         const windows = vehicle.service_windows || [];
         if (!windows.length) {
-          $("serviceWindows").innerHTML = "<p>No schedule windows available.</p>";
+          $("currentWindow").innerHTML = "<p>No schedule windows available.</p>";
+          $("previousWindow").innerHTML = "<p>No schedule windows available.</p>";
+          $("nextWindow").innerHTML = "<p>No schedule windows available.</p>";
           $("windowSummary").innerHTML = "<p>No schedule summary available.</p>";
           return;
         }
 
-        $("serviceWindows").innerHTML = windows.map((window) => {
-          const title = window.label.charAt(0).toUpperCase() + window.label.slice(1);
-          const currentClass = window.label === "current" ? "window current" : "window";
-          const items = window.items.map((item) => {
-            const checked = state.checkedItemIds.has(item.id) ? "checked" : "";
-            const dueBadge = badgeForStatus(item.due_status);
-            const lastDone = item.due_status?.last_service_odometer
-              ? `Last done at ${item.due_status.last_service_odometer.toLocaleString()} mi`
-              : "No logged service yet";
-            return `
-              <label class="check">
-                <input type="checkbox" data-item-id="${item.id}" ${checked} />
-                <div>
-                  <div class="check-title">${item.name}</div>
-                  <div class="muted">${lastDone}</div>
-                  <div class="stack">${dueBadge}</div>
-                </div>
-              </label>
-            `;
-          }).join("");
-          return `
-            <div class="${currentClass}">
-              <div class="window-head">
-                <div>
-                  <h3>${title}</h3>
-                  <p>${window.scheduled_mileage.toLocaleString()} miles</p>
-                </div>
-                ${window.label === "current" ? '<span class="pill current">Focus window</span>' : ""}
-              </div>
-              <div class="checklist">${items || "<p>No items in this window.</p>"}</div>
-            </div>
-          `;
-        }).join("");
+        const byLabel = Object.fromEntries(windows.map((window) => [window.label, window]));
+        $("currentWindow").innerHTML = windowMarkup(byLabel.current, true);
+        $("previousWindow").innerHTML = windowMarkup(byLabel.previous, false);
+        $("nextWindow").innerHTML = windowMarkup(byLabel.next, false);
 
-        const summaryLines = windows.map((window) =>
-          `<p><strong>${window.label.charAt(0).toUpperCase() + window.label.slice(1)}:</strong> ${window.scheduled_mileage.toLocaleString()} mi</p>`
-        ).join("");
-        $("windowSummary").innerHTML = summaryLines;
+        $("windowSummary").innerHTML = `
+          <div class="window-summary-grid">
+            ${windows.map((window) => `
+              <div class="window-summary-item">
+                <strong>${window.label.charAt(0).toUpperCase() + window.label.slice(1)}</strong><br />
+                ${window.scheduled_mileage.toLocaleString()} mi
+              </div>
+            `).join("")}
+          </div>
+        `;
 
         document.querySelectorAll("input[data-item-id]").forEach((checkbox) => {
           checkbox.addEventListener("change", (event) => {
@@ -273,7 +366,9 @@
         if (!vehicle) {
           $("vehicleSummary").innerHTML = "<p>No vehicles available.</p>";
           $("vehicleDetails").innerHTML = "";
-          $("serviceWindows").innerHTML = "";
+          $("currentWindow").innerHTML = "";
+          $("previousWindow").innerHTML = "";
+          $("nextWindow").innerHTML = "";
           $("windowSummary").innerHTML = "";
           $("history").innerHTML = "";
           return;
@@ -373,6 +468,16 @@
         const vehicle = selectedVehicle();
         if (!vehicle) return;
         await sendAction("delete_vehicle", { vehicle_id: vehicle.vehicle_id });
+      });
+
+      $("snapshotMenuButton").addEventListener("click", () => {
+        $("snapshotMenu").classList.toggle("open");
+      });
+
+      document.addEventListener("click", (event) => {
+        if (!event.target.closest(".menu-wrap")) {
+          $("snapshotMenu").classList.remove("open");
+        }
       });
 
       const bootstrap = async () => {
