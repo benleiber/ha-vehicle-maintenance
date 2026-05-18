@@ -74,7 +74,7 @@ SEED_TEMPLATES: dict[str, dict[str, Any]] = {
             },
             {
                 "id": "air_cleaner_element",
-                "name": "Air Cleaner Element",
+                "name": "Engine Air Filter",
                 "interval_miles": 30000,
                 "interval_months": 30,
                 "manufacturer_anchor_miles": 30000,
@@ -194,7 +194,7 @@ SEED_TEMPLATES: dict[str, dict[str, Any]] = {
             },
             {
                 "id": "hvac_filter",
-                "name": "HVAC System A/C Filter",
+                "name": "Cabin Air Filter",
                 "interval_miles": 12000,
                 "interval_months": 12,
                 "manufacturer_anchor_miles": 12000,
@@ -221,7 +221,7 @@ SEED_TEMPLATES: dict[str, dict[str, Any]] = {
             },
             {
                 "id": "air_filter",
-                "name": "Air Filter",
+                "name": "Engine Air Filter",
                 "interval_miles": 30000,
                 "interval_months": 48,
                 "manufacturer_anchor_miles": 30000,
