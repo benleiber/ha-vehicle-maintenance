@@ -281,6 +281,7 @@
             <div class="menu-wrap">
               <button id="snapshotMenuButton" class="menu-trigger" aria-label="Vehicle actions">&#8942;</button>
               <div id="snapshotMenu" class="menu">
+                <button id="addVehicleButton" type="button">Add vehicle</button>
                 <button id="editVehicleButton" type="button">Edit vehicle</button>
                 <button id="viewVehicleHistoryButton" type="button">View history</button>
                 <button id="importVehicleButton" type="button">Import vehicle</button>
@@ -554,6 +555,7 @@
 
       function cloneVehicleForEditing(vehicle) {
         return {
+          mode: "edit",
           vehicle_id: vehicle.vehicle_id,
           name: vehicle.vehicle.name || "",
           year: vehicle.vehicle.year ?? "",
@@ -576,10 +578,43 @@
         };
       }
 
+      function blankVehicleEditorState() {
+        return {
+          mode: "add",
+          vehicle_id: null,
+          name: "",
+          year: new Date(today).getFullYear(),
+          make: "",
+          model: "",
+          trim: "",
+          engine: "",
+          vin: "",
+          purchase_date: "",
+          purchase_odometer: "",
+          warranty_start_date: "",
+          warranty_years: "",
+          warranty_miles: "",
+          warranty_name: "",
+          current_odometer: 0,
+          odometer_source_mode: "manual",
+          odometer_entity_id: "",
+          template_id: "",
+          subscriptions: [],
+        };
+      }
+
+      function startAddingVehicle() {
+        state.editingVehicle = blankVehicleEditorState();
+        state.currentPage = "dashboard";
+        render();
+        $("vehicleEditor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
       function startEditingVehicle() {
         const vehicle = selectedVehicle();
         if (!vehicle) return;
         state.editingVehicle = cloneVehicleForEditing(vehicle);
+        state.currentPage = "dashboard";
         render();
         $("vehicleEditor")?.scrollIntoView({ behavior: "smooth", block: "start" });
       }
@@ -674,14 +709,16 @@
         $(targetId).innerHTML = markup;
       }
 
-      function renderVehicleEditor(vehicle) {
+      function renderVehicleEditor() {
         const editor = $("vehicleEditor");
         if (!editor) return;
-        if (!state.editingVehicle || !vehicle) {
+        if (!state.editingVehicle) {
           editor.hidden = true;
           editor.innerHTML = "";
           return;
         }
+
+        const isAddMode = state.editingVehicle.mode === "add";
 
         const templateOptions = [
           '<option value="">Custom / keep existing schedule</option>',
@@ -720,8 +757,10 @@
         editor.innerHTML = `
           <div class="card-head">
             <div>
-              <h2>Edit Vehicle</h2>
-              <p>Update the original vehicle profile fields and optionally track renewable plans like SiriusXM, roadside assistance, or a connected security package.</p>
+              <h2>${isAddMode ? "Add Vehicle" : "Edit Vehicle"}</h2>
+              <p>${isAddMode
+                ? "Create a vehicle with whatever details you know now, then come back later to fill in the rest once you have more exact information."
+                : "Update the original vehicle profile fields and optionally track renewable plans like SiriusXM, roadside assistance, or a connected security package."}</p>
             </div>
           </div>
           <div class="row">
@@ -773,7 +812,7 @@
           <div id="subscriptionList" class="subscription-list">${subscriptionMarkup}</div>
           <div class="stack" style="margin-top: 12px;">
             <button id="addSubscriptionButton" class="secondary" type="button">Add subscription</button>
-            <button id="saveVehicleButton" type="button">Save vehicle</button>
+            <button id="saveVehicleButton" type="button">${isAddMode ? "Add vehicle" : "Save vehicle"}</button>
             <button id="cancelVehicleEditButton" class="secondary" type="button">Cancel</button>
           </div>
         `;
@@ -796,14 +835,18 @@
         });
 
         $("saveVehicleButton")?.addEventListener("click", async () => {
-          const updates = collectVehicleUpdates();
-          if (!updates) {
+          const vehicleData = collectVehicleUpdates();
+          if (!vehicleData) {
             return;
           }
-          await sendAction("edit_vehicle", {
-            vehicle_id: state.editingVehicle.vehicle_id,
-            updates,
-          });
+          if (isAddMode) {
+            await sendAction("add_vehicle", vehicleData);
+          } else {
+            await sendAction("edit_vehicle", {
+              vehicle_id: state.editingVehicle.vehicle_id,
+              updates: vehicleData,
+            });
+          }
           state.editingVehicle = null;
           render();
         });
@@ -975,7 +1018,7 @@
         if (!vehicle) {
           $("vehicleSummary").innerHTML = "<p>No vehicles available.</p>";
           $("vehicleDetails").innerHTML = "";
-          renderVehicleEditor(null);
+          renderVehicleEditor();
           $("currentWindow").innerHTML = "";
           $("previousWindow").innerHTML = "";
           $("nextWindow").innerHTML = "";
@@ -1035,7 +1078,7 @@
           </div>
         `;
 
-        renderVehicleEditor(vehicle);
+        renderVehicleEditor();
         renderServiceWindows(vehicle);
         renderHistoryList("fullHistory", vehicle.all_service_records || [], "No history yet.");
 
@@ -1152,10 +1195,13 @@
           const payload = await callApi("POST", "vehicle_maintenance/ui-action", { action, data });
           state.templates = payload.templates || state.templates;
           state.vehicles = payload.vehicles || [];
+          if (payload.added_vehicle_id) {
+            state.selectedVehicleId = payload.added_vehicle_id;
+          }
           if (payload.imported_vehicle_id) {
             state.selectedVehicleId = payload.imported_vehicle_id;
           }
-          if (action === "edit_vehicle") {
+          if (action === "edit_vehicle" || action === "add_vehicle") {
             resetPaneFormState();
           }
           if (action === "delete_vehicle" && !state.vehicles.some((v) => v.vehicle_id === state.selectedVehicleId)) {
@@ -1236,6 +1282,11 @@
         const vehicle = selectedVehicle();
         if (!vehicle) return;
         await sendAction("delete_vehicle", { vehicle_id: vehicle.vehicle_id });
+      });
+
+      $("addVehicleButton").addEventListener("click", () => {
+        startAddingVehicle();
+        $("snapshotMenu").classList.remove("open");
       });
 
       $("editVehicleButton").addEventListener("click", () => {

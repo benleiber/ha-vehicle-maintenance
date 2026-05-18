@@ -172,6 +172,9 @@ class VehicleMaintenancePanelActionView(HomeAssistantView):
             await coordinator.async_log_maintenance(payload["data"])
         elif action == "log_service_record":
             await coordinator.async_log_service_record(payload["data"])
+        elif action == "add_vehicle":
+            vehicle = await coordinator.async_add_vehicle(payload["data"])
+            response_payload["added_vehicle_id"] = vehicle.id
         elif action == "edit_vehicle":
             await coordinator.async_edit_vehicle(
                 payload["data"]["vehicle_id"],
