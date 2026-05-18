@@ -265,6 +265,57 @@ def get_scheduled_items_for_mileage(
     ]
 
 
+def get_schedule_window_mileages(vehicle: Vehicle) -> list[int]:
+    """Return a sorted list of candidate schedule mileages around the current odometer."""
+    current_odometer = vehicle.current_odometer
+    mileages: set[int] = set()
+    for item in vehicle.schedule_items:
+        anchor = item.manufacturer_anchor_miles or item.interval_miles
+        if anchor is None:
+            continue
+        interval = item.interval_miles or anchor
+        if current_odometer <= anchor:
+            mileages.add(anchor)
+            mileages.add(anchor + interval)
+            continue
+        periods = ceil((current_odometer - anchor) / interval)
+        current_window = anchor + (periods * interval)
+        mileages.add(current_window)
+        if current_window - interval >= anchor:
+            mileages.add(current_window - interval)
+        mileages.add(current_window + interval)
+    return sorted(mileage for mileage in mileages if mileage >= 0)
+
+
+def get_service_windows(vehicle: Vehicle) -> list[dict[str, Any]]:
+    """Return previous/current/next mileage windows for checklist logging."""
+    candidate_mileages = get_schedule_window_mileages(vehicle)
+    if not candidate_mileages:
+        return []
+
+    current_odometer = vehicle.current_odometer
+    current_index = 0
+    for index, mileage in enumerate(candidate_mileages):
+        current_index = index
+        if mileage >= current_odometer:
+            break
+    labels = ["previous", "current", "next"]
+    windows: list[dict[str, Any]] = []
+    for label, offset in zip(labels, (-1, 0, 1), strict=True):
+        index = current_index + offset
+        if index < 0 or index >= len(candidate_mileages):
+            continue
+        mileage = candidate_mileages[index]
+        windows.append(
+            {
+                "label": label,
+                "scheduled_mileage": mileage,
+                "items": get_scheduled_items_for_mileage(vehicle, mileage),
+            }
+        )
+    return windows
+
+
 def calculate_warranty_expiration_date(vehicle: Vehicle) -> str | None:
     """Return the projected warranty expiration date."""
     if vehicle.warranty_start_date is None or vehicle.warranty_years is None:

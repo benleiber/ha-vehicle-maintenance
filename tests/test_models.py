@@ -10,6 +10,7 @@ from custom_components.vehicle_maintenance.models import (
     calculate_warranty_expiration_date,
     calculate_warranty_miles_remaining,
     get_scheduled_items_for_mileage,
+    get_service_windows,
     summarize_due,
 )
 
@@ -208,3 +209,36 @@ def test_ad_hoc_service_record_does_not_reset_schedule() -> None:
 
     assert status.next_due_mileage == 30000
     assert status.basis == "manufacturer_anchor"
+
+
+def test_service_windows_surround_current_odometer() -> None:
+    vehicle = Vehicle(
+        id="veh1",
+        name="Subaru",
+        year=2024,
+        make="Subaru",
+        model="Outback",
+        trim="Onyx XT",
+        engine="2.4T",
+        current_odometer=26000,
+        schedule_items=[
+            MaintenanceItemDefinition(
+                id="engine_oil",
+                name="Engine Oil",
+                interval_miles=6000,
+                manufacturer_anchor_miles=6000,
+                resets_on_service=True,
+            ),
+            MaintenanceItemDefinition(
+                id="air_cleaner_element",
+                name="Air Cleaner Element",
+                interval_miles=30000,
+                manufacturer_anchor_miles=30000,
+            ),
+        ],
+    )
+
+    windows = get_service_windows(vehicle)
+
+    assert [window["label"] for window in windows] == ["previous", "current", "next"]
+    assert [window["scheduled_mileage"] for window in windows] == [24000, 30000, 36000]

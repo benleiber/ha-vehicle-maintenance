@@ -12,7 +12,7 @@ from homeassistant.components.http import HomeAssistantView, StaticPathConfig
 from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
-from .models import event_to_dict, vehicle_to_dict
+from .models import due_status_to_dict, get_service_windows, vehicle_to_dict
 
 PANEL_URL_PATH = "vehicle-maintenance"
 PANEL_HTML_PATH = "/api/vehicle_maintenance/panel"
@@ -69,6 +69,24 @@ def _serialize_vehicle_panel_data(coordinator) -> dict[str, Any]:
             }
             for item in vehicle.schedule_items
         ]
+        service_windows = [
+            {
+                "label": window["label"],
+                "scheduled_mileage": window["scheduled_mileage"],
+                "items": [
+                    {
+                        **asdict(item),
+                        "due_status": (
+                            None
+                            if item.id not in snapshot["due_statuses"]
+                            else due_status_to_dict(snapshot["due_statuses"][item.id])
+                        ),
+                    }
+                    for item in window["items"]
+                ],
+            }
+            for window in get_service_windows(vehicle)
+        ]
         vehicles.append(
             {
                 "vehicle_id": vehicle_id,
@@ -78,6 +96,7 @@ def _serialize_vehicle_panel_data(coordinator) -> dict[str, Any]:
                 "warranty_expiration_date": snapshot["warranty_expiration_date"],
                 "warranty_miles_remaining": snapshot["warranty_miles_remaining"],
                 "schedule_items": schedule_items,
+                "service_windows": service_windows,
                 "recent_service_records": snapshot["recent_service_records"],
                 "delete_confirmation_armed": coordinator.is_delete_armed(vehicle_id),
                 "delete_confirmation_armed_until": coordinator.get_delete_armed_until(vehicle_id),
