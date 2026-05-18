@@ -15,6 +15,7 @@ from custom_components.vehicle_maintenance.models import (
     get_scheduled_items_for_mileage,
     get_service_windows,
     summarize_due,
+    template_from_import,
 )
 
 
@@ -243,6 +244,33 @@ def test_total_maintenance_cost_adds_logged_costs_for_vehicle() -> None:
     ]
 
     assert calculate_total_maintenance_cost("veh1", events) == 105.75
+
+
+def test_template_from_import_normalizes_template_package() -> None:
+    template = template_from_import(
+        {
+            "format": "vehicle_maintenance_template",
+            "version": 1,
+            "template": {
+                "label": "2023 Honda CR-V 1.5T (custom import)",
+                "items": [
+                    {
+                        "name": "Engine Oil",
+                        "interval_miles": 7500,
+                        "interval_months": 12,
+                        "manufacturer_anchor_miles": 7500,
+                        "resets_on_service": True,
+                    }
+                ],
+            },
+        },
+        existing_ids={"2023_honda_cr_v_1_5t_custom_import"},
+    )
+
+    assert template.id == "2023_honda_cr_v_1_5t_custom_import_2"
+    assert template.label == "2023 Honda CR-V 1.5T (custom import)"
+    assert template.items[0].id == "engine_oil"
+    assert template.items[0].interval_miles == 7500
 
 
 def test_ad_hoc_service_record_does_not_reset_schedule() -> None:

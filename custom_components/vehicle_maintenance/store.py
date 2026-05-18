@@ -19,6 +19,9 @@ from .models import (
     event_to_dict,
     make_service_event,
     make_vehicle,
+    template_from_dict,
+    template_from_import,
+    template_to_dict,
     vehicle_from_dict,
     vehicle_to_dict,
 )
@@ -32,6 +35,7 @@ class VehicleMaintenanceStore:
         self._store: Store[dict[str, Any]] = Store(hass, STORAGE_VERSION, STORAGE_KEY)
         self.vehicles: dict[str, Vehicle] = {}
         self.service_events: list[ServiceEvent] = []
+        self.custom_templates: dict[str, MaintenanceTemplate] = {}
 
     async def async_load(self) -> None:
         """Load stored data."""
@@ -40,12 +44,16 @@ class VehicleMaintenanceStore:
             item["id"]: vehicle_from_dict(item) for item in data.get("vehicles", [])
         }
         self.service_events = [event_from_dict(item) for item in data.get("service_events", [])]
+        self.custom_templates = {
+            item["id"]: template_from_dict(item) for item in data.get("templates", [])
+        }
 
     async def async_save(self) -> None:
         """Persist current state."""
         payload = {
             "vehicles": [vehicle_to_dict(vehicle) for vehicle in self.vehicles.values()],
             "service_events": [event_to_dict(event) for event in self.service_events],
+            "templates": [template_to_dict(template) for template in self.custom_templates.values()],
         }
         await self._store.async_save(payload)
 
@@ -180,3 +188,14 @@ class VehicleMaintenanceStore:
         self.service_events.extend(normalized_events)
         await self.async_save()
         return vehicle
+
+    async def async_import_template_package(
+        self,
+        package: dict[str, Any],
+        existing_ids: set[str] | None = None,
+    ) -> MaintenanceTemplate:
+        """Import and persist a custom maintenance template."""
+        template = template_from_import(package, existing_ids=existing_ids)
+        self.custom_templates[template.id] = template
+        await self.async_save()
+        return template

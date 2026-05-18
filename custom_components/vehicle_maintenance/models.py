@@ -5,10 +5,12 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from datetime import date, timedelta
 from math import ceil
+import re
 from typing import Any
 from uuid import uuid4
 
 from .const import (
+    ATTR_SCHEDULE_DISCLAIMER,
     DEFAULT_DUE_SOON_MILES,
     DEFAULT_OVERDUE_MILES,
     ODOMETER_MODE_ENTITY,
@@ -22,6 +24,11 @@ def _today() -> date:
 
 def _months_to_days(months: int) -> int:
     return months * 30
+
+
+def _slugify_identifier(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "_", value.strip().lower()).strip("_")
+    return slug or uuid4().hex
 
 
 @dataclass(slots=True)
@@ -159,6 +166,89 @@ def template_from_dict(data: dict[str, Any]) -> MaintenanceTemplate:
         label=data["label"],
         disclaimer=data["disclaimer"],
         items=[MaintenanceItemDefinition(**item) for item in data.get("items", [])],
+    )
+
+
+def template_to_dict(template: MaintenanceTemplate) -> dict[str, Any]:
+    """Serialize a maintenance template."""
+    return asdict(template)
+
+
+def template_from_import(
+    data: dict[str, Any],
+    existing_ids: set[str] | None = None,
+) -> MaintenanceTemplate:
+    """Build a custom template from an imported package or raw template dict."""
+    template_payload = dict(data.get("template", data))
+    label = str(template_payload.get("label", "")).strip()
+    if not label:
+        msg = "Imported template requires a non-empty label"
+        raise ValueError(msg)
+
+    template_id = _slugify_identifier(str(template_payload.get("id") or label))
+    existing_ids = existing_ids or set()
+    base_template_id = template_id
+    suffix = 2
+    while template_id in existing_ids:
+        template_id = f"{base_template_id}_{suffix}"
+        suffix += 1
+
+    items_payload = template_payload.get("items")
+    if not isinstance(items_payload, list) or not items_payload:
+        msg = "Imported template requires a non-empty items list"
+        raise ValueError(msg)
+
+    items: list[MaintenanceItemDefinition] = []
+    seen_item_ids: set[str] = set()
+    for raw_item in items_payload:
+        if not isinstance(raw_item, dict):
+            msg = "Every imported item must be an object"
+            raise ValueError(msg)
+        item_name = str(raw_item.get("name", "")).strip()
+        if not item_name:
+            msg = "Every imported item requires a non-empty name"
+            raise ValueError(msg)
+        item_id = _slugify_identifier(str(raw_item.get("id") or item_name))
+        if item_id in seen_item_ids:
+            msg = f"Duplicate imported item id: {item_id}"
+            raise ValueError(msg)
+        seen_item_ids.add(item_id)
+        items.append(
+            MaintenanceItemDefinition(
+                id=item_id,
+                name=item_name,
+                interval_miles=(
+                    None
+                    if raw_item.get("interval_miles") is None
+                    else int(raw_item["interval_miles"])
+                ),
+                interval_months=(
+                    None
+                    if raw_item.get("interval_months") is None
+                    else int(raw_item["interval_months"])
+                ),
+                manufacturer_anchor_miles=(
+                    None
+                    if raw_item.get("manufacturer_anchor_miles") is None
+                    else int(raw_item["manufacturer_anchor_miles"])
+                ),
+                flexible=bool(raw_item.get("flexible", False)),
+                resets_on_service=bool(raw_item.get("resets_on_service", False)),
+                due_soon_threshold_miles=int(
+                    raw_item.get("due_soon_threshold_miles", DEFAULT_DUE_SOON_MILES)
+                ),
+                overdue_threshold_miles=int(
+                    raw_item.get("overdue_threshold_miles", DEFAULT_OVERDUE_MILES)
+                ),
+            )
+        )
+
+    disclaimer = str(template_payload.get("disclaimer") or ATTR_SCHEDULE_DISCLAIMER).strip()
+    return MaintenanceTemplate(
+        id=template_id,
+        label=label,
+        disclaimer=disclaimer,
+        items=items,
     )
 
 

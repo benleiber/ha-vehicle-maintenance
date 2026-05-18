@@ -282,6 +282,7 @@
               <button id="snapshotMenuButton" class="menu-trigger" aria-label="Vehicle actions">&#8942;</button>
               <div id="snapshotMenu" class="menu">
                 <button id="addVehicleButton" type="button">Add vehicle</button>
+                <button id="importTemplateButton" type="button">Import template</button>
                 <button id="editVehicleButton" type="button">Edit vehicle</button>
                 <button id="viewVehicleHistoryButton" type="button">View history</button>
                 <button id="importVehicleButton" type="button">Import vehicle</button>
@@ -296,6 +297,7 @@
 
       <section id="vehicleEditor" class="card editor-shell" hidden></section>
 
+      <input id="importTemplateFile" type="file" accept="application/json" hidden />
       <input id="importVehicleFile" type="file" accept="application/json" hidden />
 
       <div id="dashboardPage" class="page-shell">
@@ -1195,6 +1197,9 @@
           const payload = await callApi("POST", "vehicle_maintenance/ui-action", { action, data });
           state.templates = payload.templates || state.templates;
           state.vehicles = payload.vehicles || [];
+          if (payload.imported_template_id && state.editingVehicle) {
+            state.editingVehicle.template_id = payload.imported_template_id;
+          }
           if (payload.added_vehicle_id) {
             state.selectedVehicleId = payload.added_vehicle_id;
           }
@@ -1289,6 +1294,11 @@
         $("snapshotMenu").classList.remove("open");
       });
 
+      $("importTemplateButton").addEventListener("click", () => {
+        $("snapshotMenu").classList.remove("open");
+        $("importTemplateFile").click();
+      });
+
       $("editVehicleButton").addEventListener("click", () => {
         startEditingVehicle();
         $("snapshotMenu").classList.remove("open");
@@ -1356,6 +1366,26 @@
           $("status").textContent = "Vehicle imported.";
         } catch (error) {
           $("status").textContent = error?.message || "Import failed";
+        } finally {
+          event.target.value = "";
+        }
+      });
+
+      $("importTemplateFile").addEventListener("change", async (event) => {
+        const [file] = event.target.files || [];
+        if (!file) {
+          return;
+        }
+        try {
+          const packageData = JSON.parse(await file.text());
+          const templatePayload = packageData?.template || packageData;
+          if (!templatePayload?.label || !Array.isArray(templatePayload?.items)) {
+            throw new Error("Invalid template package");
+          }
+          await sendAction("import_template", { package: packageData });
+          $("status").textContent = "Template imported.";
+        } catch (error) {
+          $("status").textContent = error?.message || "Template import failed";
         } finally {
           event.target.value = "";
         }

@@ -58,6 +58,7 @@ class VehicleMaintenanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             for template_id, template in SEED_TEMPLATES.items()
         }
         await self.store.async_load()
+        self.templates.update(self.store.custom_templates)
         self._setup_entity_listener()
         await self.async_refresh()
 
@@ -265,6 +266,16 @@ class VehicleMaintenanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._setup_entity_listener()
         await self.async_refresh()
         return vehicle
+
+    async def async_import_template_package(self, package: dict[str, Any]) -> MaintenanceTemplate:
+        """Import a custom maintenance template and refresh state."""
+        template = await self.store.async_import_template_package(
+            package,
+            existing_ids=set(self.templates),
+        )
+        self.templates[template.id] = template
+        await self.async_refresh()
+        return template
 
     def get_vehicle_snapshot(self, vehicle_id: str) -> dict[str, Any]:
         """Return computed state for a vehicle."""

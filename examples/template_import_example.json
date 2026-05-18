@@ -1,0 +1,44 @@
+{
+  "format": "vehicle_maintenance_template",
+  "version": 1,
+  "template": {
+    "id": "2023_honda_cr_v_15t_custom",
+    "label": "2023 Honda CR-V 1.5T (custom import)",
+    "disclaimer": "Seed template only. Verify maintenance schedule against the manufacturer guidance.",
+    "items": [
+      {
+        "id": "engine_oil",
+        "name": "Engine Oil",
+        "interval_miles": 7500,
+        "interval_months": 12,
+        "manufacturer_anchor_miles": 7500,
+        "flexible": false,
+        "resets_on_service": true,
+        "due_soon_threshold_miles": 500,
+        "overdue_threshold_miles": 0
+      },
+      {
+        "id": "tire_rotation",
+        "name": "Tire Rotation",
+        "interval_miles": 7500,
+        "interval_months": 12,
+        "manufacturer_anchor_miles": 7500,
+        "flexible": false,
+        "resets_on_service": true,
+        "due_soon_threshold_miles": 500,
+        "overdue_threshold_miles": 0
+      },
+      {
+        "id": "drive_belts",
+        "name": "Drive Belts",
+        "interval_miles": 30000,
+        "interval_months": 36,
+        "manufacturer_anchor_miles": 30000,
+        "flexible": false,
+        "resets_on_service": true,
+        "due_soon_threshold_miles": 1000,
+        "overdue_threshold_miles": 0
+      }
+    ]
+  }
+}

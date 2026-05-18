@@ -180,6 +180,9 @@ class VehicleMaintenancePanelActionView(HomeAssistantView):
                 payload["data"]["vehicle_id"],
                 payload["data"]["updates"],
             )
+        elif action == "import_template":
+            template = await coordinator.async_import_template_package(payload["data"]["package"])
+            response_payload["imported_template_id"] = template.id
         elif action == "import_vehicle":
             vehicle = await coordinator.async_import_vehicle_package(payload["data"]["package"])
             response_payload["imported_vehicle_id"] = vehicle.id
