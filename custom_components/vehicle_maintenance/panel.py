@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-import json
 from pathlib import Path
 from typing import Any
 
@@ -94,7 +93,7 @@ def _serialize_vehicle_panel_data(coordinator) -> dict[str, Any]:
 class VehicleMaintenancePanelView(HomeAssistantView):
     """Serve the panel shell."""
 
-    requires_auth = True
+    requires_auth = False
     url = PANEL_HTML_PATH
     name = "api:vehicle_maintenance:panel"
 

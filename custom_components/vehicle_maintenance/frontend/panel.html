@@ -138,9 +138,20 @@
       const today = new Date().toISOString().slice(0, 10);
       ["visitDate", "maintenanceDate", "recordDate"].forEach((id) => { $(id).value = today; });
 
+      function getHass() {
+        return window.parent?.document?.querySelector("home-assistant")?.hass ?? null;
+      }
+
+      async function callApi(method, path, body) {
+        const hass = getHass();
+        if (!hass) {
+          throw new Error("Home Assistant session unavailable");
+        }
+        return hass.callApi(method, path, body);
+      }
+
       async function fetchData() {
-        const response = await fetch("/api/vehicle_maintenance/ui-data", { credentials: "same-origin" });
-        const data = await response.json();
+        const data = await callApi("GET", "/api/vehicle_maintenance/ui-data");
         state.vehicles = data.vehicles || [];
         if (!state.selectedVehicleId && state.vehicles.length) {
           state.selectedVehicleId = state.vehicles[0].vehicle_id;
@@ -212,25 +223,20 @@
 
       async function sendAction(action, data) {
         $("status").textContent = "Saving…";
-        const response = await fetch("/api/vehicle_maintenance/ui-action", {
-          method: "POST",
-          credentials: "same-origin",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action, data }),
-        });
-        const payload = await response.json();
-        if (!response.ok) {
-          $("status").textContent = payload.error || "Request failed";
+        try {
+          const payload = await callApi("POST", "/api/vehicle_maintenance/ui-action", { action, data });
+          state.vehicles = payload.vehicles || [];
+          if (action === "delete_vehicle" && !state.vehicles.some((v) => v.vehicle_id === state.selectedVehicleId)) {
+            state.selectedVehicleId = state.vehicles[0]?.vehicle_id ?? null;
+          }
+          render();
+          $("status").textContent = action === "delete_vehicle" && selectedVehicle()?.delete_confirmation_armed
+            ? "Delete armed. Press again within 30 seconds to confirm."
+            : "Saved.";
+        } catch (error) {
+          $("status").textContent = error?.message || "Request failed";
           return;
         }
-        state.vehicles = payload.vehicles || [];
-        if (action === "delete_vehicle" && !state.vehicles.some((v) => v.vehicle_id === state.selectedVehicleId)) {
-          state.selectedVehicleId = state.vehicles[0]?.vehicle_id ?? null;
-        }
-        render();
-        $("status").textContent = action === "delete_vehicle" && selectedVehicle()?.delete_confirmation_armed
-          ? "Delete armed. Press again within 30 seconds to confirm."
-          : "Saved.";
       }
 
       $("vehicleSelect").addEventListener("change", (event) => {
@@ -288,7 +294,23 @@
         await sendAction("delete_vehicle", { vehicle_id: vehicle.vehicle_id });
       });
 
-      fetchData();
+      const bootstrap = async () => {
+        for (let attempt = 0; attempt < 20; attempt += 1) {
+          if (getHass()) {
+            try {
+              await fetchData();
+              return;
+            } catch (error) {
+              $("status").textContent = error?.message || "Failed to load data";
+              return;
+            }
+          }
+          await new Promise((resolve) => setTimeout(resolve, 250));
+        }
+        $("status").textContent = "Home Assistant session unavailable";
+      };
+
+      bootstrap();
     </script>
   </body>
 </html>
