@@ -477,6 +477,7 @@
         checkedItemIds: new Set(),
         editingVehicle: null,
         editingServiceItem: null,
+        armedServiceItemDeleteId: null,
         editingRecord: null,
         historyGroups: [],
       };
@@ -489,6 +490,7 @@
         const vehicle = selectedVehicle();
         state.checkedItemIds = new Set();
         state.editingServiceItem = null;
+        state.armedServiceItemDeleteId = null;
         state.editingRecord = null;
         $("visitDate").value = today;
         $("visitOdo").value = vehicle ? vehicle.vehicle.current_odometer : "";
@@ -1174,7 +1176,7 @@
                     </label>
                     <div class="service-list-actions">
                       <button type="button" data-edit-service-item="${item.id}" aria-label="Edit service item" title="Edit service item">&#9998;</button>
-                      <button type="button" class="delete" data-delete-service-item="${item.id}" aria-label="Delete service item" title="Delete service item">&#128465;</button>
+                      <button type="button" class="delete" data-delete-service-item="${item.id}" aria-label="${state.armedServiceItemDeleteId === item.id ? "Confirm delete service item" : "Delete service item"}" title="${state.armedServiceItemDeleteId === item.id ? "Confirm delete service item" : "Delete service item"}">${state.armedServiceItemDeleteId === item.id ? "!" : "&#128465;"}</button>
                     </div>
                   </div>
                 </div>
@@ -1231,6 +1233,13 @@
         document.querySelectorAll("button[data-delete-service-item]").forEach((button) => {
           button.addEventListener("click", async () => {
             const itemId = button.dataset.deleteServiceItem;
+            if (state.armedServiceItemDeleteId !== itemId) {
+              state.armedServiceItemDeleteId = itemId;
+              $("status").textContent = "Press delete again to confirm removing this service item.";
+              render();
+              return;
+            }
+            state.armedServiceItemDeleteId = null;
             state.checkedItemIds.delete(itemId);
             await sendAction("delete_service_item", {
               vehicle_id: vehicle.vehicle_id,
@@ -1471,6 +1480,7 @@
             state.checkedItemIds = new Set();
             state.editingVehicle = null;
             state.editingServiceItem = null;
+            state.armedServiceItemDeleteId = null;
             state.editingRecord = null;
           }
           render();
@@ -1486,6 +1496,7 @@
         state.selectedVehicleId = event.target.value;
         state.editingVehicle = null;
         state.editingServiceItem = null;
+        state.armedServiceItemDeleteId = null;
         resetPaneFormState();
         render();
       });
