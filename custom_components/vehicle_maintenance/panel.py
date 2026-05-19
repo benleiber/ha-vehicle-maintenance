@@ -180,6 +180,22 @@ class VehicleMaintenancePanelActionView(HomeAssistantView):
                 payload["data"]["vehicle_id"],
                 payload["data"]["updates"],
             )
+        elif action == "add_service_item":
+            await coordinator.async_add_service_item(
+                payload["data"]["vehicle_id"],
+                payload["data"]["item"],
+            )
+        elif action == "edit_service_item":
+            await coordinator.async_edit_service_item(
+                payload["data"]["vehicle_id"],
+                payload["data"]["item_id"],
+                payload["data"]["updates"],
+            )
+        elif action == "delete_service_item":
+            await coordinator.async_delete_service_item(
+                payload["data"]["vehicle_id"],
+                payload["data"]["item_id"],
+            )
         elif action == "import_template":
             template = await coordinator.async_import_template_package(payload["data"]["package"])
             response_payload["imported_template_id"] = template.id

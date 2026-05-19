@@ -202,6 +202,7 @@ class VehicleMaintenanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def async_log_service_visit(self, data: dict[str, Any]) -> None:
         """Log a complete scheduled visit or a custom multi-item visit."""
         vehicle = self.store.vehicles[data["vehicle_id"]]
+        item_lookup = {item.id: item for item in vehicle.schedule_items}
         item_ids: list[str]
         if data.get("item_ids"):
             item_ids = list(data["item_ids"])
@@ -222,7 +223,7 @@ class VehicleMaintenanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             event_data["event_type"] = "maintenance_item"
             event_data["affects_schedule"] = True
             if not event_data.get("title"):
-                event_data["title"] = item_id
+                event_data["title"] = item_lookup.get(item_id).name if item_id in item_lookup else item_id
             events.append(event_data)
         await self.store.async_log_maintenance_events(events)
         await self.async_refresh()
@@ -276,6 +277,26 @@ class VehicleMaintenanceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.templates[template.id] = template
         await self.async_refresh()
         return template
+
+    async def async_add_service_item(self, vehicle_id: str, item_data: dict[str, Any]) -> None:
+        """Add a per-vehicle service item and refresh state."""
+        await self.store.async_add_service_item(vehicle_id, item_data)
+        await self.async_refresh()
+
+    async def async_edit_service_item(
+        self,
+        vehicle_id: str,
+        item_id: str,
+        updates: dict[str, Any],
+    ) -> None:
+        """Edit a per-vehicle service item and refresh state."""
+        await self.store.async_edit_service_item(vehicle_id, item_id, updates)
+        await self.async_refresh()
+
+    async def async_delete_service_item(self, vehicle_id: str, item_id: str) -> None:
+        """Delete a per-vehicle service item and refresh state."""
+        await self.store.async_delete_service_item(vehicle_id, item_id)
+        await self.async_refresh()
 
     def get_vehicle_snapshot(self, vehicle_id: str) -> dict[str, Any]:
         """Return computed state for a vehicle."""

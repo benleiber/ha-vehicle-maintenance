@@ -250,6 +250,75 @@
       .toolbar button {
         width: auto;
       }
+      details.card {
+        padding: 0;
+        overflow: hidden;
+      }
+      details.card > summary {
+        list-style: none;
+        cursor: pointer;
+        padding: 16px;
+      }
+      details.card > summary::-webkit-details-marker {
+        display: none;
+      }
+      .summary-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .summary-chevron {
+        font-size: 1.2rem;
+        color: var(--muted);
+      }
+      details[open] .summary-chevron {
+        transform: rotate(180deg);
+      }
+      .collapsible-body {
+        padding: 0 16px 16px;
+      }
+      .service-list {
+        display: grid;
+        gap: 10px;
+      }
+      .service-list-card {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 12px;
+        background: white;
+      }
+      .service-list-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .service-list-actions {
+        display: flex;
+        gap: 8px;
+        flex-shrink: 0;
+      }
+      .service-list-actions button {
+        width: auto;
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: #f3efe4;
+        color: var(--ink);
+      }
+      .service-list-actions button.delete {
+        color: var(--danger);
+      }
+      .service-summary-list {
+        display: grid;
+        gap: 12px;
+      }
+      .summary-window {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 12px;
+        background: #fcfaf4;
+      }
       @media (max-width: 1000px) {
         .top-grid,
         .main-grid { grid-template-columns: 1fr; }
@@ -265,7 +334,7 @@
       <div class="top-grid">
         <section class="hero">
           <h1>Vehicle Maintenance</h1>
-          <p>Pick a vehicle, review what should have been done last time, what is due now, and what is next.</p>
+          <p>Pick a vehicle, log routine or non-routine work, and review the service outlook around the current odometer.</p>
           <label>
             Vehicle
             <select id="vehicleSelect"></select>
@@ -303,66 +372,78 @@
       <div id="dashboardPage" class="page-shell">
         <div class="main-grid">
           <div class="form-stack">
-            <section class="card">
-              <h2>Log Vehicle Service</h2>
-              <p>Check off exactly what was done on this visit.</p>
-              <div class="row">
-                <label>Date<input id="visitDate" type="date" /></label>
-                <label>Odometer<input id="visitOdo" type="number" min="0" /></label>
+            <details class="card" id="routineServiceCard">
+              <summary>
+                <div class="summary-head">
+                  <div>
+                    <h2>Routine Vehicle Service</h2>
+                    <p>Check off exactly what was done on this visit.</p>
+                  </div>
+                  <span class="summary-chevron">&#9662;</span>
+                </div>
+              </summary>
+              <div class="collapsible-body">
+                <div class="row">
+                  <label>Date<input id="visitDate" type="date" /></label>
+                  <label>Odometer<input id="visitOdo" type="number" min="0" /></label>
+                </div>
+                <div class="row">
+                  <label>Source<input id="visitSource" placeholder="dealer or self" /></label>
+                  <label>Cost<input id="visitCost" type="number" min="0" step="0.01" /></label>
+                </div>
+                <label>Notes<textarea id="visitNotes"></textarea></label>
+                <div class="stack">
+                  <button id="visitButton">Log routine service</button>
+                  <button id="clearPaneButton" class="secondary" type="button">Clear</button>
+                </div>
               </div>
-              <div class="row">
-                <label>Source<input id="visitSource" placeholder="dealer or self" /></label>
-                <label>Cost<input id="visitCost" type="number" min="0" step="0.01" /></label>
+            </details>
+
+            <details class="card" id="nonRoutineServiceCard">
+              <summary>
+                <div class="summary-head">
+                  <div>
+                    <h2>Non-Routine Service, Accessories, etc</h2>
+                    <p>Use this for work like a flat tire repair, alignment, accessory install, diagnostic visit, warranty repair, or glass replacement.</p>
+                  </div>
+                  <span class="summary-chevron">&#9662;</span>
+                </div>
+              </summary>
+              <div class="collapsible-body">
+                <div class="row">
+                  <label>Title<input id="recordTitle" placeholder="Flat tire repair" /></label>
+                  <label>Category<input id="recordCategory" placeholder="tire" /></label>
+                </div>
+                <div class="row">
+                  <label>Date<input id="recordDate" type="date" /></label>
+                  <label>Odometer<input id="recordOdo" type="number" min="0" /></label>
+                </div>
+                <div class="row">
+                  <label>Source<input id="recordSource" placeholder="discount tire" /></label>
+                  <label>Cost<input id="recordCost" type="number" min="0" step="0.01" /></label>
+                </div>
+                <label>Notes<textarea id="recordNotes"></textarea></label>
+                <button id="recordButton" class="secondary">Log non-routine record</button>
               </div>
-              <label>Notes<textarea id="visitNotes"></textarea></label>
-              <div class="stack">
-                <button id="visitButton">Log selected work</button>
-                <button id="clearPaneButton" class="secondary" type="button">Clear</button>
-              </div>
-            </section>
+            </details>
 
             <section class="card">
-            <h2>Ad Hoc Service Record</h2>
-            <p>Use this for work like a flat tire repair, alignment, diagnostic visit, warranty repair, or glass replacement.</p>
-            <div class="row">
-              <label>Title<input id="recordTitle" placeholder="Flat tire repair" /></label>
-              <label>Category<input id="recordCategory" placeholder="tire" /></label>
-            </div>
-            <div class="row">
-              <label>Date<input id="recordDate" type="date" /></label>
-              <label>Odometer<input id="recordOdo" type="number" min="0" /></label>
-            </div>
-            <div class="row">
-              <label>Source<input id="recordSource" placeholder="discount tire" /></label>
-              <label>Cost<input id="recordCost" type="number" min="0" step="0.01" /></label>
-            </div>
-            <label>Notes<textarea id="recordNotes"></textarea></label>
-            <button id="recordButton" class="secondary">Log service record</button>
+              <h2>Recent History</h2>
+              <div id="history" class="history"></div>
             </section>
           </div>
 
           <div class="window-stack">
             <section class="card">
-              <h2>Current</h2>
-              <p>The main service window around the current odometer.</p>
-              <div id="currentWindow"></div>
+              <h2>Services</h2>
+              <p>All available service items for this vehicle, with the most frequent items at the top.</p>
+              <div id="serviceItemManager"></div>
             </section>
 
             <section class="card">
-              <h2>Previous</h2>
-              <p>What should have been done last time.</p>
-              <div id="previousWindow"></div>
-            </section>
-
-            <section class="card">
-              <h2>Next</h2>
-              <p>What is coming up after the current service.</p>
-              <div id="nextWindow"></div>
-            </section>
-
-            <section class="card">
-              <h2>Recent History</h2>
-              <div id="history" class="history"></div>
+              <h2>Current, Previous, and Next</h2>
+              <p>A quick text summary of what the manual groups around the current odometer.</p>
+              <div id="serviceSummary"></div>
             </section>
           </div>
         </div>
@@ -391,6 +472,7 @@
         currentPage: "dashboard",
         checkedItemIds: new Set(),
         editingVehicle: null,
+        editingServiceItem: null,
         editingRecord: null,
         historyGroups: [],
       };
@@ -402,6 +484,7 @@
       function resetPaneFormState() {
         const vehicle = selectedVehicle();
         state.checkedItemIds = new Set();
+        state.editingServiceItem = null;
         state.editingRecord = null;
         $("visitDate").value = today;
         $("visitOdo").value = vehicle ? vehicle.vehicle.current_odometer : "";
@@ -908,6 +991,79 @@
         return updates;
       }
 
+      function slugifyIdentifier(value) {
+        return String(value || "")
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "_")
+          .replace(/^_+|_+$/g, "");
+      }
+
+      function blankServiceItemState() {
+        return {
+          mode: "add",
+          id: "",
+          name: "",
+          interval_miles: "",
+          interval_months: "",
+          manufacturer_anchor_miles: "",
+          flexible: false,
+          resets_on_service: true,
+          due_soon_threshold_miles: 500,
+          overdue_threshold_miles: 0,
+        };
+      }
+
+      function startAddingServiceItem() {
+        state.editingServiceItem = blankServiceItemState();
+        render();
+      }
+
+      function startEditingServiceItem(item) {
+        state.editingServiceItem = {
+          mode: "edit",
+          id: item.id,
+          name: item.name || "",
+          interval_miles: item.interval_miles ?? "",
+          interval_months: item.interval_months ?? "",
+          manufacturer_anchor_miles: item.manufacturer_anchor_miles ?? "",
+          flexible: Boolean(item.flexible),
+          resets_on_service: Boolean(item.resets_on_service),
+          due_soon_threshold_miles: item.due_soon_threshold_miles ?? 500,
+          overdue_threshold_miles: item.overdue_threshold_miles ?? 0,
+        };
+        render();
+      }
+
+      function collectServiceItemUpdates() {
+        if (!state.editingServiceItem) {
+          return null;
+        }
+        const name = $("serviceItemName")?.value?.trim() || "";
+        if (!name) {
+          $("status").textContent = "Service item name is required.";
+          return null;
+        }
+        const itemId = state.editingServiceItem.mode === "edit"
+          ? state.editingServiceItem.id
+          : slugifyIdentifier($("serviceItemId")?.value || name);
+        if (!itemId) {
+          $("status").textContent = "Service item id could not be created.";
+          return null;
+        }
+        return {
+          id: itemId,
+          name,
+          interval_miles: numberOrNull($("serviceItemIntervalMiles")?.value || ""),
+          interval_months: numberOrNull($("serviceItemIntervalMonths")?.value || ""),
+          manufacturer_anchor_miles: numberOrNull($("serviceItemAnchorMiles")?.value || ""),
+          flexible: Boolean($("serviceItemFlexible")?.checked),
+          resets_on_service: Boolean($("serviceItemResets")?.checked),
+          due_soon_threshold_miles: Number($("serviceItemDueSoonMiles")?.value || 500),
+          overdue_threshold_miles: Number($("serviceItemOverdueMiles")?.value || 0),
+        };
+      }
+
       function renderSubscriptionSummary(vehicle) {
         const subscriptions = vehicle.subscription_statuses || [];
         if (!subscriptions.length) {
@@ -935,33 +1091,21 @@
         `;
       }
 
-      function windowMarkup(window, emphasize = false) {
-        if (!window) {
-          return "<p>No window available.</p>";
-        }
-        const currentClass = emphasize ? "window current" : "window";
-        const items = window.items.map((item) => {
-          const checked = state.checkedItemIds.has(item.id) ? "checked" : "";
-          const dueBadge = badgeForStatus(item.due_status);
-          const lastDoneText = formatLastDone(item.due_status);
-          const manualNextText = formatMileage(item.due_status?.manual_next_due_mileage);
-          const adjustedNextText = formatMileage(item.due_status?.adjusted_next_due_mileage);
-          return `
-            <label class="check">
-              <input type="checkbox" data-item-id="${item.id}" ${checked} />
-              <div>
-                <div class="check-title">${item.name}</div>
-                <div class="maintenance-meta muted">
-                  <div><strong>Last done:</strong> ${lastDoneText}</div>
-                  <div><strong>Manual next:</strong> ${manualNextText}</div>
-                  <div><strong>Adjusted next:</strong> ${adjustedNextText}</div>
-                </div>
-                <div class="stack">${dueBadge}</div>
-              </div>
-            </label>
-          `;
-        }).join("");
-        const inspectionMarkup = window.label === "current" ? `
+      function serviceFrequencyScore(item) {
+        const byMiles = Number.isFinite(item.interval_miles) ? item.interval_miles : Number.MAX_SAFE_INTEGER;
+        const byMonths = Number.isFinite(item.interval_months) ? item.interval_months * 1000 : Number.MAX_SAFE_INTEGER;
+        return Math.min(byMiles, byMonths);
+      }
+
+      function renderServiceItemManager(vehicle) {
+        const items = [...(vehicle.schedule_items || [])].sort((left, right) => {
+          const frequencyCompare = serviceFrequencyScore(left) - serviceFrequencyScore(right);
+          if (frequencyCompare !== 0) {
+            return frequencyCompare;
+          }
+          return left.name.localeCompare(right.name);
+        });
+        const inspectionMarkup = `
           <label class="check">
             <input type="checkbox" data-item-id="${INSPECTION_OPTION_ID}" ${state.checkedItemIds.has(INSPECTION_OPTION_ID) ? "checked" : ""} />
             <div>
@@ -970,34 +1114,98 @@
               <div class="stack"><span class="pill">Optional</span></div>
             </div>
           </label>
-        ` : "";
-        return `
-          <div class="${currentClass}">
-            <div class="window-head">
-              <div>
-                <h3>${window.scheduled_mileage.toLocaleString()} miles</h3>
-              </div>
-              ${window.label === "current" ? '<span class="pill current">Focus window</span>' : ""}
+        `;
+        const editorMarkup = state.editingServiceItem ? `
+          <div class="editor-card">
+            <h3>${state.editingServiceItem.mode === "edit" ? "Edit Service Item" : "Add Service Item"}</h3>
+            <div class="row">
+              <label>Name<input id="serviceItemName" value="${escapeHtml(state.editingServiceItem.name)}" /></label>
+              <label>Item id<input id="serviceItemId" value="${escapeHtml(state.editingServiceItem.id)}" ${state.editingServiceItem.mode === "edit" ? "disabled" : ""} /></label>
             </div>
-            <div class="checklist">${inspectionMarkup}${items || "<p>No items in this window.</p>"}</div>
+            <div class="row">
+              <label>Interval miles<input id="serviceItemIntervalMiles" type="number" min="0" value="${escapeHtml(state.editingServiceItem.interval_miles)}" /></label>
+              <label>Interval months<input id="serviceItemIntervalMonths" type="number" min="0" value="${escapeHtml(state.editingServiceItem.interval_months)}" /></label>
+            </div>
+            <div class="row">
+              <label>Manufacturer anchor miles<input id="serviceItemAnchorMiles" type="number" min="0" value="${escapeHtml(state.editingServiceItem.manufacturer_anchor_miles)}" /></label>
+              <label>Due soon threshold miles<input id="serviceItemDueSoonMiles" type="number" min="0" value="${escapeHtml(state.editingServiceItem.due_soon_threshold_miles)}" /></label>
+            </div>
+            <div class="row">
+              <label>Overdue threshold miles<input id="serviceItemOverdueMiles" type="number" value="${escapeHtml(state.editingServiceItem.overdue_threshold_miles)}" /></label>
+              <label><input id="serviceItemFlexible" type="checkbox" ${state.editingServiceItem.flexible ? "checked" : ""} /> Flexible item</label>
+            </div>
+            <label><input id="serviceItemResets" type="checkbox" ${state.editingServiceItem.resets_on_service ? "checked" : ""} /> Resets on service</label>
+            <div class="stack" style="margin-top: 12px;">
+              <button id="saveServiceItemButton" type="button">${state.editingServiceItem.mode === "edit" ? "Save service item" : "Add service item"}</button>
+              <button id="cancelServiceItemButton" class="secondary" type="button">Cancel</button>
+            </div>
+          </div>
+        ` : "";
+        $("serviceItemManager").innerHTML = `
+          ${editorMarkup}
+          <div class="stack" style="margin-bottom: 12px;">
+            <button id="addServiceItemButton" class="secondary" type="button">Add service item</button>
+          </div>
+          <div class="checklist">
+            ${inspectionMarkup}
+            ${items.length ? items.map((item) => {
+              const dueBadge = badgeForStatus(item.due_status);
+              const lastDoneText = formatLastDone(item.due_status);
+              const manualNextText = formatMileage(item.due_status?.manual_next_due_mileage);
+              const adjustedNextText = formatMileage(item.due_status?.adjusted_next_due_mileage);
+              return `
+                <div class="service-list-card">
+                  <div class="service-list-head">
+                    <label class="check" style="border:none;padding:0;flex:1;">
+                      <input type="checkbox" data-item-id="${item.id}" ${state.checkedItemIds.has(item.id) ? "checked" : ""} />
+                      <div>
+                        <div class="check-title">${escapeHtml(item.name)}</div>
+                        <div class="maintenance-meta muted">
+                          <div><strong>Last done:</strong> ${lastDoneText}</div>
+                          <div><strong>Manual next:</strong> ${manualNextText}</div>
+                          <div><strong>Adjusted next:</strong> ${adjustedNextText}</div>
+                        </div>
+                        <div class="stack">${dueBadge}</div>
+                      </div>
+                    </label>
+                    <div class="service-list-actions">
+                      <button type="button" data-edit-service-item="${item.id}">Edit</button>
+                      <button type="button" class="delete" data-delete-service-item="${item.id}">Delete</button>
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join("") : "<p>No service items configured yet.</p>"}
           </div>
         `;
-      }
 
-      function renderServiceWindows(vehicle) {
-        const windows = vehicle.service_windows || [];
-        if (!windows.length) {
-          $("currentWindow").innerHTML = "<p>No schedule windows available.</p>";
-          $("previousWindow").innerHTML = "<p>No schedule windows available.</p>";
-          $("nextWindow").innerHTML = "<p>No schedule windows available.</p>";
-          return;
-        }
-
-        const byLabel = Object.fromEntries(windows.map((window) => [window.label, window]));
-        $("currentWindow").innerHTML = windowMarkup(byLabel.current, true);
-        $("previousWindow").innerHTML = windowMarkup(byLabel.previous, false);
-        $("nextWindow").innerHTML = windowMarkup(byLabel.next, false);
-
+        $("addServiceItemButton")?.addEventListener("click", () => {
+          startAddingServiceItem();
+        });
+        $("cancelServiceItemButton")?.addEventListener("click", () => {
+          state.editingServiceItem = null;
+          render();
+        });
+        $("saveServiceItemButton")?.addEventListener("click", async () => {
+          const updates = collectServiceItemUpdates();
+          if (!updates) {
+            return;
+          }
+          if (state.editingServiceItem?.mode === "edit") {
+            await sendAction("edit_service_item", {
+              vehicle_id: vehicle.vehicle_id,
+              item_id: state.editingServiceItem.id,
+              updates,
+            });
+          } else {
+            await sendAction("add_service_item", {
+              vehicle_id: vehicle.vehicle_id,
+              item: updates,
+            });
+          }
+          state.editingServiceItem = null;
+          render();
+        });
         document.querySelectorAll("input[data-item-id]").forEach((checkbox) => {
           checkbox.addEventListener("change", (event) => {
             const itemId = event.target.dataset.itemId;
@@ -1008,6 +1216,51 @@
             }
           });
         });
+        document.querySelectorAll("button[data-edit-service-item]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const item = items.find((entry) => entry.id === button.dataset.editServiceItem);
+            if (item) {
+              startEditingServiceItem(item);
+            }
+          });
+        });
+        document.querySelectorAll("button[data-delete-service-item]").forEach((button) => {
+          button.addEventListener("click", async () => {
+            const itemId = button.dataset.deleteServiceItem;
+            state.checkedItemIds.delete(itemId);
+            await sendAction("delete_service_item", {
+              vehicle_id: vehicle.vehicle_id,
+              item_id: itemId,
+            });
+            if (state.editingServiceItem?.id === itemId) {
+              state.editingServiceItem = null;
+            }
+          });
+        });
+      }
+
+      function renderServiceSummary(vehicle) {
+        const windows = vehicle.service_windows || [];
+        if (!windows.length) {
+          $("serviceSummary").innerHTML = "<p>No schedule windows available.</p>";
+          return;
+        }
+        const windowOrder = { current: 0, previous: 1, next: 2 };
+        const labelMap = {
+          current: "Current",
+          previous: "Previous",
+          next: "Next",
+        };
+        $("serviceSummary").innerHTML = `
+          <div class="service-summary-list">
+            ${[...windows].sort((left, right) => (windowOrder[left.label] ?? 9) - (windowOrder[right.label] ?? 9)).map((window) => `
+              <div class="summary-window">
+                <strong>${labelMap[window.label] || window.label} | ${window.scheduled_mileage.toLocaleString()} mi</strong>
+                <div class="muted">${window.items.length ? window.items.map((item) => item.name).join(", ") : "No scheduled items in this window."}</div>
+              </div>
+            `).join("")}
+          </div>
+        `;
       }
 
       function render() {
@@ -1021,9 +1274,8 @@
           $("vehicleSummary").innerHTML = "<p>No vehicles available.</p>";
           $("vehicleDetails").innerHTML = "";
           renderVehicleEditor();
-          $("currentWindow").innerHTML = "";
-          $("previousWindow").innerHTML = "";
-          $("nextWindow").innerHTML = "";
+          $("serviceItemManager").innerHTML = "";
+          $("serviceSummary").innerHTML = "";
           $("history").innerHTML = "";
           $("fullHistory").innerHTML = "";
           return;
@@ -1081,7 +1333,8 @@
         `;
 
         renderVehicleEditor();
-        renderServiceWindows(vehicle);
+        renderServiceItemManager(vehicle);
+        renderServiceSummary(vehicle);
         renderHistoryList("fullHistory", vehicle.all_service_records || [], "No history yet.");
 
         const editorMarkup = state.editingRecord ? `
@@ -1213,6 +1466,7 @@
             state.selectedVehicleId = state.vehicles[0]?.vehicle_id ?? null;
             state.checkedItemIds = new Set();
             state.editingVehicle = null;
+            state.editingServiceItem = null;
             state.editingRecord = null;
           }
           render();
@@ -1227,6 +1481,7 @@
       $("vehicleSelect").addEventListener("change", (event) => {
         state.selectedVehicleId = event.target.value;
         state.editingVehicle = null;
+        state.editingServiceItem = null;
         resetPaneFormState();
         render();
       });

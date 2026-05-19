@@ -174,6 +174,16 @@ def template_to_dict(template: MaintenanceTemplate) -> dict[str, Any]:
     return asdict(template)
 
 
+def maintenance_item_from_dict(data: dict[str, Any]) -> MaintenanceItemDefinition:
+    """Deserialize a maintenance item definition."""
+    return MaintenanceItemDefinition(**data)
+
+
+def maintenance_item_to_dict(item: MaintenanceItemDefinition) -> dict[str, Any]:
+    """Serialize a maintenance item definition."""
+    return asdict(item)
+
+
 def template_from_import(
     data: dict[str, Any],
     existing_ids: set[str] | None = None,

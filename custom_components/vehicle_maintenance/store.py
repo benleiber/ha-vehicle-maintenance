@@ -13,10 +13,13 @@ from dataclasses import asdict
 
 from .models import (
     MaintenanceTemplate,
+    MaintenanceItemDefinition,
     ServiceEvent,
     Vehicle,
     event_from_dict,
     event_to_dict,
+    maintenance_item_from_dict,
+    maintenance_item_to_dict,
     make_service_event,
     make_vehicle,
     template_from_dict,
@@ -78,7 +81,7 @@ class VehicleMaintenanceStore:
         vehicle = self.vehicles[vehicle_id]
         current = deepcopy(vehicle_to_dict(vehicle))
         current.update(updates)
-        if template is not None:
+        if template is not None and updates.get("template_id") != vehicle.template_id:
             current["template_id"] = template.id
             current["schedule_items"] = [asdict(item) for item in template.items]
             current["template_disclaimer"] = template.disclaimer
@@ -86,6 +89,52 @@ class VehicleMaintenanceStore:
         self.vehicles[vehicle_id] = updated
         await self.async_save()
         return updated
+
+    async def async_add_service_item(
+        self,
+        vehicle_id: str,
+        item_data: dict[str, Any],
+    ) -> MaintenanceItemDefinition:
+        """Add a per-vehicle maintenance item."""
+        vehicle = self.vehicles[vehicle_id]
+        item = maintenance_item_from_dict(item_data)
+        if any(existing.id == item.id for existing in vehicle.schedule_items):
+            msg = f"Service item id already exists: {item.id}"
+            raise ValueError(msg)
+        vehicle.schedule_items.append(item)
+        await self.async_save()
+        return item
+
+    async def async_edit_service_item(
+        self,
+        vehicle_id: str,
+        item_id: str,
+        updates: dict[str, Any],
+    ) -> MaintenanceItemDefinition:
+        """Edit a per-vehicle maintenance item."""
+        vehicle = self.vehicles[vehicle_id]
+        for index, item in enumerate(vehicle.schedule_items):
+            if item.id != item_id:
+                continue
+            current = maintenance_item_to_dict(item)
+            current.update(updates)
+            current["id"] = item.id
+            updated = maintenance_item_from_dict(current)
+            vehicle.schedule_items[index] = updated
+            await self.async_save()
+            return updated
+        msg = f"Unknown service item {item_id}"
+        raise KeyError(msg)
+
+    async def async_delete_service_item(self, vehicle_id: str, item_id: str) -> None:
+        """Delete a per-vehicle maintenance item."""
+        vehicle = self.vehicles[vehicle_id]
+        before_count = len(vehicle.schedule_items)
+        vehicle.schedule_items = [item for item in vehicle.schedule_items if item.id != item_id]
+        if len(vehicle.schedule_items) == before_count:
+            msg = f"Unknown service item {item_id}"
+            raise KeyError(msg)
+        await self.async_save()
 
     async def async_delete_vehicle(self, vehicle_id: str) -> None:
         """Delete a vehicle and its events."""
