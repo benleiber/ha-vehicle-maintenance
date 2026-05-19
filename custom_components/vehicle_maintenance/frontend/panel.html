@@ -305,6 +305,10 @@
         border-radius: 10px;
         background: #f3efe4;
         color: var(--ink);
+        min-width: 40px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
       }
       .service-list-actions button.delete {
         color: var(--danger);
@@ -1169,8 +1173,8 @@
                       </div>
                     </label>
                     <div class="service-list-actions">
-                      <button type="button" data-edit-service-item="${item.id}">Edit</button>
-                      <button type="button" class="delete" data-delete-service-item="${item.id}">Delete</button>
+                      <button type="button" data-edit-service-item="${item.id}" aria-label="Edit service item" title="Edit service item">&#9998;</button>
+                      <button type="button" class="delete" data-delete-service-item="${item.id}" aria-label="Delete service item" title="Delete service item">&#128465;</button>
                     </div>
                   </div>
                 </div>
